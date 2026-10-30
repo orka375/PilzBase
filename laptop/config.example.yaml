@@ -2,4 +2,4 @@ bind_host: 127.0.0.1
 port: 8080
 stations: []
 # Add stations from the browser at http://127.0.0.1:8080/
-# Saved stations and tokens are persisted next to this config file.
+# Saved station addresses are persisted in this config file.
