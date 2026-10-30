@@ -57,3 +57,15 @@ def test_expiry(tmp_path):
     assert not e.tick()
     assert e.status()["state"] == "FINISHED"
     s.close()
+
+
+def test_dashboard_served(tmp_path):
+    cfg = Config(database_path=str(tmp_path / "dashboard.sqlite3"), api_token="testtoken")
+    app = create_app(cfg)
+    with TestClient(app) as client:
+        response = client.get("/")
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "PilzBase" in response.text
+        assert "/api/v1/status" in response.text
+        assert "Start experiment" in response.text
