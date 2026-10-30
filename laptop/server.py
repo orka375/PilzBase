@@ -53,20 +53,13 @@ def load_config(path: str):
     return {"stations": stations, "bind_host": host, "port": port, "config_path": str(Path(path).resolve())}
 
 
-def _token(sid):
-    return os.getenv("PILZBASE_" + sid.replace("-", "_") + "_TOKEN", "")
-
-
-def fetch_station(sid, base_url, path, method="GET", *, timeout=4, token=None):
-    token = token if token is not None else _token(sid)
-    if not token:
-        raise RuntimeError(f"Token for {sid} is not configured")
-    # Explicitly disable redirects to prevent forwarding tokens to a different host.
+def fetch_station(sid, base_url, path, method="GET", *, timeout=4):
+    # Do not follow redirects to unexpected hosts.
     from urllib.request import build_opener, HTTPRedirectHandler
     class NoRedirect(HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
             return None
-    req = Request(base_url + path, headers={"Authorization": "Bearer " + token}, method=method)
+    req = Request(base_url + path, method=method)
     try:
         with build_opener(NoRedirect).open(req, timeout=timeout) as response:
             body = response.read(2_000_000)
@@ -82,8 +75,6 @@ def create_app(config):
     stations = dict(config["stations"])
     lock = RLock()
     config_path = config.get("config_path")
-    credentials_path = Path(config_path).with_suffix(".tokens.json") if config_path else None
-    token_store = json.loads(credentials_path.read_text(encoding="utf-8")) if credentials_path and credentials_path.exists() else {}
 
     def persist():
         if not config_path:
@@ -91,10 +82,7 @@ def create_app(config):
         config_file = Path(config_path)
         obj = {"bind_host": config["bind_host"], "port": config["port"],
                "stations": [{"id": sid, "url": url} for sid, url in sorted(stations.items())]}
-        for target, payload, mode in (
-            (config_file, yaml.safe_dump(obj, sort_keys=False), 0o600),
-            (credentials_path, json.dumps(token_store), 0o600)
-        ):
+        for target, payload, mode in ((config_file, yaml.safe_dump(obj, sort_keys=False), 0o600),):
             fd, tmp = tempfile.mkstemp(prefix=".pilzbase-", dir=target.parent)
             try:
                 os.fchmod(fd, mode)
@@ -128,21 +116,18 @@ def create_app(config):
     @app.post("/api/stations/connect")
     async def connect(request: Request):
         data = await request.json()
-        sid, token = data.get("id"), data.get("token")
+        sid = data.get("id")
         if sid not in {f"UNIT-{i:02}" for i in range(1, 6)}:
             raise HTTPException(400, "Invalid station ID")
-        if not isinstance(token, str) or not (1 <= len(token) <= 512):
-            raise HTTPException(400, "Enter the station API token")
         url = await asyncio.to_thread(verify_address, data.get("address"))
         try:
-            status = await asyncio.to_thread(fetch_station, sid, url, "/api/v1/status", token=token)
+            status = await asyncio.to_thread(fetch_station, sid, url, "/api/v1/status")
         except RuntimeError as exc:
             raise HTTPException(502, "Connection failed: " + str(exc)) from exc
         if status.get("station_id") != sid:
             raise HTTPException(409, "Connected device has another station ID")
         with lock:
             stations[sid] = url
-            token_store[sid] = token
             persist()
         return {"id": sid, "url": url, "connected": True}
 
@@ -152,7 +137,6 @@ def create_app(config):
             if sid not in stations:
                 raise HTTPException(404, "Unknown station")
             del stations[sid]
-            token_store.pop(sid, None)
             persist()
         return {"removed": sid}
 
@@ -169,7 +153,7 @@ def create_app(config):
         if sid not in stations:
             raise HTTPException(404, "Unknown station")
         try:
-            return await asyncio.to_thread(fetch_station, sid, stations[sid], endpoint, method, token=token_store.get(sid) or _token(sid))
+            return await asyncio.to_thread(fetch_station, sid, stations[sid], endpoint, method)
         except RuntimeError as exc:
             raise HTTPException(502, str(exc)) from exc
 
