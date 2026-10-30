@@ -20,7 +20,7 @@ canvas{width:100%;height:270px;display:block}
 <main><div class="row"><div><h2 style="font-size:26px">Experiment overview</h2><p class="muted">All stations continue recording independently if this dashboard closes.</p></div>
 <div class="actions"><button id="refresh">↻ Refresh</button><button id="startAll" class="primary">▶ Start all</button><button id="stopAll" class="danger">■ Stop all</button></div></div>
 <p id="summary" class="muted">Connecting…</p><div id="message" aria-live="polite"></div>
-<section class="section panel"><div class="row"><div><h2>Add or update station</h2><p class="muted">Enter a hostname or IP, then verify the station and save its connection.</p></div><form id="addStation" class="actions"><select id="newId" aria-label="Station"><option>UNIT-01</option><option>UNIT-02</option><option>UNIT-03</option><option>UNIT-04</option><option>UNIT-05</option></select><input id="newAddress" placeholder="pilzbase-01.local or 192.168.1.101" required aria-label="IP address or hostname"><input id="newToken" type="password" placeholder="Station API token" required autocomplete="off" aria-label="API token"><button class="primary" type="submit">Connect &amp; save</button></form></div></section><section id="cards" class="grid"></section>
+<section class="section panel"><div class="row"><div><h2>Add or update station</h2><p class="muted">Enter a hostname or IP, then verify the station and save its connection.</p></div><form id="addStation" class="actions"><select id="newId" aria-label="Station"><option>UNIT-01</option><option>UNIT-02</option><option>UNIT-03</option><option>UNIT-04</option><option>UNIT-05</option></select><input id="newAddress" placeholder="pilzbase-01.local or 192.168.1.101" required aria-label="IP address or hostname"><button class="primary" type="submit">Connect &amp; save</button></form></div></section><section id="cards" class="grid"></section>
 <section class="section panel"><div class="row"><div><h2>Compare stations</h2><p class="muted">Recent measurements, one signal across all stations</p></div><select id="metric"><option value="pt100_1_c">PT100-1 temperature (°C)</option><option value="co2_ppm">CO₂ (ppm)</option><option value="humidity_rh_pct">Humidity (%)</option><option value="laser_distance_mm">Laser distance (mm)</option><option value="soil_voltage_v">Soil voltage (V)</option></select></div><canvas id="trend"></canvas></section>
 <p class="muted section">Dashboard updates every 15 seconds · Offline stations cannot be controlled · Data shown are simulated until real sensor drivers are installed.</p>
 </main><script>
@@ -71,8 +71,8 @@ $("addStation").onsubmit=async event=>{
 event.preventDefault();
 const form=$("addStation"),button=form.querySelector("button[type=submit]");
 button.disabled=true;$("message").textContent="Connecting to station…";
-try{const result=await request("/api/stations/connect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:$("newId").value,address:$("newAddress").value.trim(),token:$("newToken").value})});
-$("newToken").value="";$("message").textContent=result.id+" successfully connected at "+result.url;await refresh()}
+try{const result=await request("/api/stations/connect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:$("newId").value,address:$("newAddress").value.trim()})});
+$("message").textContent=result.id+" successfully connected at "+result.url;await refresh()}
 catch(e){$("message").textContent="Could not add station: "+e.message}
 finally{button.disabled=false}};
 let series={};
