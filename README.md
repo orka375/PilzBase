@@ -69,3 +69,7 @@ Open `http://127.0.0.1:8000/` from the Pi (or `http://<pi-address>:8000/` when r
 - Power loss can still damage SD storage; use reliable power and backups.
 - CSV exports are paginated; use `after_id` to retrieve the full dataset.
 - Physical sensor drivers, calibration, clock-health checks, end-to-end backup, and soak tests are required before a real 56-day experiment.
+
+## Central five-station laptop dashboard
+
+Run the optional laptop-side control center to monitor **UNIT-01 through UNIT-05** from one browser. Each Raspberry Pi keeps recording autonomously. See [laptop setup instructions](laptop/README.md). The control center defaults to `http://127.0.0.1:8080/` on the laptop and proxies each Pi's authenticated REST API. Its group start/stop commands are best-effort, **not synchronized or atomic**.
