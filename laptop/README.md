@@ -48,3 +48,9 @@ The laptop server listens on loopback only and holds station tokens server-side,
 - Comparison plots show the last 240 records only.
 - Current station firmware reports **simulated** sensor measurements. Validate real sensor drivers, synchronization, backup, and recovery before using data scientifically.
 - The central dashboard is not a second measurement logger; data remain on each Pi.
+
+## Add a Raspberry Pi from the browser
+
+Open the laptop dashboard, choose a station ID (UNIT-01 to UNIT-05), type the Pi IP address or hostname (for example `192.168.1.101` or `unit-01.local`, optionally `:8000`), enter that station's `PILZBASE_API_TOKEN`, and click **Connect & save**. The laptop tests `/api/v1/status`, verifies that the returned station ID matches, and saves the address and token. Connected stations survive restarts. You can update the address/token by connecting again with the same unit ID or remove a station from its card. Removed stations continue logging independently.
+
+Station credentials are stored in `laptop/config.tokens.json` with restrictive permissions on Unix. Protect this file and your laptop account. Only the locally hosted dashboard can configure stations; never expose port 8080 to untrusted users. Connection is limited to privately addressed targets. For best security and reliability, use a trusted dedicated laboratory LAN and DHCP reservations. The station's own API must listen on its LAN interface.
