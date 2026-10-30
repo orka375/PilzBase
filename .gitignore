@@ -8,3 +8,6 @@ __pycache__/
 .env
 secrets.env
 data/
+
+# Central dashboard station addresses / credentials
+laptop/config.yaml
