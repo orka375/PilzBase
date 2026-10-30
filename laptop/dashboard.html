@@ -1,0 +1,87 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PilzBase · Central dashboard</title>
+<style>
+:root{font:15px system-ui;color:#eaf7f0;background:#0c1613}*{box-sizing:border-box}body{margin:0}
+header{border-bottom:1px solid #315246;background:#11231d;padding:20px 5vw;display:flex;justify-content:space-between;align-items:center}
+h1{margin:0;font-size:22px}h2{font-size:17px;margin:0 0 12px}
+main{max-width:1280px;margin:auto;padding:28px 24px}.muted{color:#a6bdb2;font-size:13px}.actions{display:flex;flex-wrap:wrap;gap:9px}
+button,select{font:inherit;padding:9px 12px;border-radius:8px;border:1px solid #47645a;background:#213b30;color:#eaf7f0;cursor:pointer}button:disabled{opacity:.4;cursor:not-allowed}
+button.primary{background:#75dba9;color:#11281b;border-color:#75dba9}.danger{color:#ffc1b5;border-color:#96594e}
+.row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:15px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin-top:20px}
+.card,.panel{background:#14251e;border:1px solid #315044;border-radius:15px;padding:19px;min-width:0}.card.off{opacity:.64}
+.label{font-weight:800;font-size:17px}.badge{display:inline-block;color:#8de6b3;background:#214a35;border-radius:30px;padding:5px 10px;font-size:12px}.badge.off{color:#ffc1b5;background:#512e2b}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:17px 0}.num{font-size:23px;font-weight:750;margin-top:3px}
+.card .actions{margin-top:13px}.section{margin-top:20px}
+canvas{width:100%;height:270px;display:block}
+#message{min-height:19px;color:#ffbcae;font-size:13px;margin-top:8px}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:610px){.grid{grid-template-columns:1fr}main{padding:20px 14px}}
+</style></head><body>
+<header><h1>◉ PilzBase <span class="muted">/ CONTROL CENTER</span></h1><span class="muted">5-STATION MONITORING</span></header>
+<main><div class="row"><div><h2 style="font-size:26px">Experiment overview</h2><p class="muted">All stations continue recording independently if this dashboard closes.</p></div>
+<div class="actions"><button id="refresh">↻ Refresh</button><button id="startAll" class="primary">▶ Start all</button><button id="stopAll" class="danger">■ Stop all</button></div></div>
+<p id="summary" class="muted">Connecting…</p><div id="message" aria-live="polite"></div>
+<section id="cards" class="grid"></section>
+<section class="section panel"><div class="row"><div><h2>Compare stations</h2><p class="muted">Recent measurements, one signal across all stations</p></div><select id="metric"><option value="pt100_1_c">PT100-1 temperature (°C)</option><option value="co2_ppm">CO₂ (ppm)</option><option value="humidity_rh_pct">Humidity (%)</option><option value="laser_distance_mm">Laser distance (mm)</option><option value="soil_voltage_v">Soil voltage (V)</option></select></div><canvas id="trend"></canvas></section>
+<p class="muted section">Dashboard updates every 15 seconds · Offline stations cannot be controlled · Data shown are simulated until real sensor drivers are installed.</p>
+</main><script>
+"use strict";
+const $=id=>document.getElementById(id);let stations=[],busy=false;
+const fmt=(v,n=1)=>typeof v==="number"?v.toFixed(n):"—";
+const date=v=>v?new Date(v).toLocaleString():"—";
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
+function button(text,cls,fn,disabled){const b=el("button",cls,text);b.onclick=fn;b.disabled=disabled;return b}
+async function request(path,options){const r=await fetch(path,{cache:"no-store",...options});if(!r.ok){let msg="HTTP "+r.status;try{msg+=": "+(await r.json()).detail}catch{}throw Error(msg)}return r.json()}
+async function control(id,verb){
+if(!confirm((verb==="start"?"Start":"Stop")+" "+(id||"all stations")+"?"))return;
+busy=true;$("message").textContent="Sending commands…";
+try{const ids=id?[id]:stations.filter(s=>s.online && (verb==="start"?s.status.state!=="MEASURING":s.status.state==="MEASURING")).map(s=>s.id);
+const results=await Promise.allSettled(ids.map(sid=>request("/api/stations/"+sid+"/"+verb,{method:"POST"})));
+const failed=results.map((r,i)=>r.status==="rejected"?ids[i]+": "+r.reason.message:null).filter(Boolean);
+$("message").textContent=failed.length?failed.join("; "):"Commands completed: "+ids.length+" station(s).";}catch(e){$("message").textContent=e.message}
+finally{busy=false;await refresh()}}
+function drawCards(){
+const root=$("cards");root.replaceChildren();
+for(const s of stations){
+const card=el("article","card"+(s.online?"":" off"));const head=el("div","row");head.append(el("span","label",s.id),el("span","badge"+(s.online?"":" off"),s.online?s.status.state:"OFFLINE"));card.append(head);
+const latest=s.latest?.values||{};const metrics=el("div","metrics");
+for(const [label,value] of [["PT100-1",fmt(latest.pt100_1_c)+" °C"],["CO₂",fmt(latest.co2_ppm,0)+" ppm"],["Humidity",fmt(latest.humidity_rh_pct)+" %"],["Laser",fmt(latest.laser_distance_mm)+" mm"]]){
+ const m=el("div");m.append(el("div","muted",label),el("div","num",s.online?value:"—"));metrics.append(m)}
+card.append(metrics);card.append(el("p","muted",s.online?"Samples: "+s.status.measurements+" · Last: "+date(s.latest?.acquired_at):s.error||"Station unreachable"));
+const controls=el("div","actions");const running=s.online&&s.status.state==="MEASURING";
+controls.append(button("Start","primary",()=>control(s.id,"start"),!s.online||running||busy));
+controls.append(button("Stop","danger",()=>control(s.id,"stop"),!running||busy));
+controls.append(button("Export CSV","",()=>exportCsv(s.id),!s.online||busy));
+card.append(controls);root.append(card)
+}}
+async function exportCsv(id){
+try{let after=0;let all=[];let header="";for(let page=0;page<200;page++){
+ const rows=(await request("/api/stations/"+id+"/measurements?after_id="+after+"&limit=5000")).rows;
+ if(!rows.length)break;
+ if(!header)header=["id","experiment_id","acquired_at",...Object.keys(rows[0].values)].join(",");
+ rows.forEach(row=>all.push([row.id,row.experiment_id,row.acquired_at,...Object.values(row.values)].map(v=>v??"").join(",")));
+ after=rows[rows.length-1].id;if(rows.length<5000)break;
+}
+const blob=new Blob([header+"\n"+all.join("\n")+"\n"],{type:"text/csv"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=id+"-measurements.csv";a.click();setTimeout(()=>URL.revokeObjectURL(url),30000)
+}catch(e){$("message").textContent=id+": "+e.message}}
+let series={};
+async function drawTrend(){
+const canvas=$("trend"),rect=canvas.getBoundingClientRect(),ratio=devicePixelRatio||1;canvas.width=Math.round(rect.width*ratio);canvas.height=Math.round(rect.height*ratio);const ctx=canvas.getContext("2d");ctx.scale(ratio,ratio);
+const metric=$("metric").value;const colors=["#77e0ac","#78b8ff","#ffd27e","#e69ad8","#f58989"];const left=52,top=15,width=rect.width-70,height=rect.height-45;
+const all=Object.values(series).flatMap(rows=>rows.map(r=>({t:Date.parse(r.acquired_at),v:r.values?.[metric]})).filter(p=>Number.isFinite(p.t)&&typeof p.v==="number"));
+if(!all.length){ctx.fillStyle="#a6bdb2";ctx.fillText("No measurements available",55,130);return}
+let min=Math.min(...all.map(p=>p.v)),max=Math.max(...all.map(p=>p.v)),t0=Math.min(...all.map(p=>p.t)),t1=Math.max(...all.map(p=>p.t));if(max===min){min-=1;max+=1}if(t0===t1)t1++;
+const x=t=>left+(t-t0)/(t1-t0)*width,y=v=>top+(max-v)/(max-min)*height;
+ctx.font="12px system-ui";for(let i=0;i<4;i++){const yy=top+i*height/3;ctx.strokeStyle="#315044";ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(left+width,yy);ctx.stroke();ctx.fillStyle="#afc5b8";ctx.fillText((max-(max-min)*i/3).toFixed(1),3,yy+4)}
+stations.forEach((s,index)=>{const rows=series[s.id]||[];ctx.strokeStyle=colors[index];ctx.lineWidth=2;ctx.beginPath();let opened=false;
+ rows.forEach(r=>{const t=Date.parse(r.acquired_at),v=r.values?.[metric];if(!Number.isFinite(t)||typeof v!=="number"){opened=false;return}if(!opened){ctx.moveTo(x(t),y(v));opened=true}else ctx.lineTo(x(t),y(v))});ctx.stroke();
+ ctx.fillStyle=colors[index];ctx.fillText(s.id,left+index*80,rect.height-7)})}
+async function refresh(){
+try{
+ const payload=await request("/api/stations");stations=payload.stations;$("summary").textContent=stations.filter(s=>s.online).length+" / 5 stations online · "+stations.filter(s=>s.online&&s.status.state==="MEASURING").length+" measuring";
+ drawCards();
+ const results=await Promise.all(stations.filter(s=>s.online).map(async s=>{try{const offset=Math.max(0,(s.status.measurements||0)-240);return [s.id,(await request("/api/stations/"+s.id+"/measurements?after_id="+offset+"&limit=240")).rows]}catch{return[s.id,[]]}}));
+ series=Object.fromEntries(results);drawTrend();
+}catch(e){$("message").textContent="Unable to refresh: "+e.message}}
+$("startAll").onclick=()=>control(null,"start");$("stopAll").onclick=()=>control(null,"stop");$("refresh").onclick=refresh;$("metric").onchange=drawTrend;
+window.addEventListener("resize",drawTrend);refresh();setInterval(refresh,15000);
+</script></body></html>
