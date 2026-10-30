@@ -1,16 +1,5 @@
 bind_host: 127.0.0.1
 port: 8080
-poll_seconds: 15
-stations:
-  - id: UNIT-01
-    url: http://192.168.1.101:8000
-  - id: UNIT-02
-    url: http://192.168.1.102:8000
-  - id: UNIT-03
-    url: http://192.168.1.103:8000
-  - id: UNIT-04
-    url: http://192.168.1.104:8000
-  - id: UNIT-05
-    url: http://192.168.1.105:8000
-# Configure PILZBASE_UNIT_01_TOKEN through PILZBASE_UNIT_05_TOKEN as
-# environment variables. Never commit these credentials to Git.
+stations: []
+# Add stations from the browser at http://127.0.0.1:8080/
+# Saved stations and tokens are persisted next to this config file.
