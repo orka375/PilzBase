@@ -8,7 +8,6 @@ User=pilzbase
 Group=pilzbase
 WorkingDirectory=/opt/pilzbase
 Environment=PILZBASE_CONFIG=/etc/pilzbase/config.yaml
-EnvironmentFile=-/etc/pilzbase/secrets.env
 ExecStart=/opt/pilzbase/.venv/bin/pilzbase
 Restart=always
 RestartSec=5
