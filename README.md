@@ -45,6 +45,10 @@ sudo systemctl enable --now pilzbase
 journalctl -u pilzbase -f
 ```
 
+## Browser dashboard
+
+Open `http://127.0.0.1:8000/` from the Pi (or `http://<pi-address>:8000/` when running on a trusted local network with `api_host: 0.0.0.0`). Enter the `PILZBASE_API_TOKEN` to connect. The page shows station status, latest values, temperature and CO₂ trends, start/stop controls, recent measurements and a full paginated CSV download. It polls the Pi every 15 seconds and works without external CDNs or internet access. The browser holds the token only in session storage for the current tab. Only one station is shown per dashboard; a future laptop dashboard will combine all five units. Avoid exposing the unencrypted HTTP API on untrusted networks.
+
 ## API endpoints
 
 | Method | Endpoint | Purpose |
