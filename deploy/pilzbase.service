@@ -1,0 +1,23 @@
+[Unit]
+Description=PilzBase autonomous station logger
+After=network.target
+
+[Service]
+Type=simple
+User=pilzbase
+Group=pilzbase
+WorkingDirectory=/opt/pilzbase
+Environment=PILZBASE_CONFIG=/etc/pilzbase/config.yaml
+EnvironmentFile=-/etc/pilzbase/secrets.env
+ExecStart=/opt/pilzbase/.venv/bin/pilzbase
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/pilzbase
+StateDirectory=pilzbase
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
