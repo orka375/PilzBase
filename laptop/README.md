@@ -15,22 +15,17 @@ pip install -e '.[test]'
 cp laptop/config.example.yaml laptop/config.yaml
 ```
 
-Edit `laptop/config.yaml` with the five Pi IP addresses. Use fixed addresses/DHCP reservations for reliable discovery. Each station must run the PilzBase logger with `api_host: 0.0.0.0` and a unique `PILZBASE_API_TOKEN`. Network traffic is plain HTTP, so use **only a trusted isolated laboratory network or a secure tunnel/VPN**, never an untrusted or public network.
+Configure station addresses from the browser; the YAML starts with an empty station list. Use fixed addresses/DHCP reservations for reliable discovery. Each station must run the PilzBase logger with `api_host: 0.0.0.0`. Network traffic is plain HTTP, so use **only a trusted isolated laboratory network or a secure tunnel/VPN**, never an untrusted or public network.
 
-Set the corresponding station tokens on the laptop; for example:
+Start the laptop dashboard:
 
 ```bash
-export PILZBASE_UNIT_01_TOKEN='token-from-unit-01'
-export PILZBASE_UNIT_02_TOKEN='token-from-unit-02'
-export PILZBASE_UNIT_03_TOKEN='token-from-unit-03'
-export PILZBASE_UNIT_04_TOKEN='token-from-unit-04'
-export PILZBASE_UNIT_05_TOKEN='token-from-unit-05'
 python -m laptop.server --config laptop/config.yaml
 ```
 
 Open **http://127.0.0.1:8080/** in the laptop's browser.
 
-The laptop server listens on loopback only and holds station tokens server-side, so they are not sent to browser JavaScript. **Do not expose the laptop dashboard server to a network** without adding its own authentication and TLS.
+The laptop server listens on loopback only and does not require tokens or passwords. **Do not expose the laptop dashboard server to a network** without adding its own authentication and TLS.
 
 ## Features
 
@@ -51,6 +46,8 @@ The laptop server listens on loopback only and holds station tokens server-side,
 
 ## Add a Raspberry Pi from the browser
 
-Open the laptop dashboard, choose a station ID (UNIT-01 to UNIT-05), type the Pi IP address or hostname (for example `192.168.1.101` or `unit-01.local`, optionally `:8000`), enter that station's `PILZBASE_API_TOKEN`, and click **Connect & save**. The laptop tests `/api/v1/status`, verifies that the returned station ID matches, and saves the address and token. Connected stations survive restarts. You can update the address/token by connecting again with the same unit ID or remove a station from its card. Removed stations continue logging independently.
+Open the laptop dashboard, choose a station ID (UNIT-01 to UNIT-05), type the Pi IP address or hostname (for example `192.168.1.101` or `unit-01.local`, optionally `:8000`), and click **Connect & save**. The laptop tests `/api/v1/status`, verifies that the returned station ID matches, and saves the address. Connected stations survive restarts. You can update the address by connecting again with the same unit ID or remove a station from its card. Removed stations continue logging independently.
 
-Station credentials are stored in `laptop/config.tokens.json` with restrictive permissions on Unix. Protect this file and your laptop account. Only the locally hosted dashboard can configure stations; never expose port 8080 to untrusted users. Connection is limited to privately addressed targets. For best security and reliability, use a trusted dedicated laboratory LAN and DHCP reservations. The station's own API must listen on its LAN interface.
+No credentials are stored. Only the locally hosted dashboard can configure stations; never expose port 8080 to untrusted users. Connection is limited to privately addressed targets. For best security and reliability, use a trusted dedicated laboratory LAN and DHCP reservations. The station's own API must listen on its LAN interface.
+
+**Security:** Authentication has intentionally been removed. Anyone able to access the Raspberry Pi API can start or stop experiments or read measurements. Use only a trusted isolated lab network; do not expose the stations or dashboard to the internet.
