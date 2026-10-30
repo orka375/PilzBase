@@ -44,3 +44,26 @@ def test_dashboard_and_station_proxies(monkeypatch):
         assert all(r["online"] for r in result.json()["stations"])
         assert client.post("/api/stations/UNIT-03/stop").status_code == 200
         assert client.post("/api/stations/UNIT-99/start").status_code == 404
+
+def test_connect_and_remove(tmp_path, monkeypatch):
+    import laptop.server as server
+    cfg_file = tmp_path / "stations.yaml"
+    cfg_file.write_text("bind_host: 127.0.0.1\nport: 8080\nstations: []\n")
+    cfg = load_config(str(cfg_file))
+    monkeypatch.setattr(server.socket, "getaddrinfo", lambda *args, **kwargs: [(2, 1, 6, "", ("192.168.1.101", 8000))])
+    def fake(sid, url, path, method="GET", **kwargs):
+        if path.endswith("/status"):
+            return {"station_id": sid, "state": "READY", "measurements": 0}
+        return {"rows": []}
+    monkeypatch.setattr(server, "fetch_station", fake)
+    with TestClient(create_app(cfg)) as client:
+        result = client.post("/api/stations/connect", json={
+            "id": "UNIT-01", "address": "unit01.local", "token": "secret"
+        })
+        assert result.status_code == 200, result.text
+        assert len(client.get("/api/stations").json()["stations"]) == 1
+        assert cfg_file.with_suffix(".tokens.json").exists()
+        assert json.loads(cfg_file.with_suffix(".tokens.json").read_text())["UNIT-01"] == "secret"
+        assert load_config(str(cfg_file))["stations"]["UNIT-01"] == "http://unit01.local:8000"
+        assert client.delete("/api/stations/UNIT-01").status_code == 200
+        assert client.get("/api/stations").json()["stations"] == []
