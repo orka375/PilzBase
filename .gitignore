@@ -11,3 +11,4 @@ data/
 
 # Central dashboard station addresses / credentials
 laptop/config.yaml
+laptop/*.tokens.json
