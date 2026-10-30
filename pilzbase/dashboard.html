@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>PilzBase · Station dashboard</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;color:#e9f1ed;background:#0b1413}
+*{box-sizing:border-box}body{margin:0;min-height:100vh}button,input,select{font:inherit}button{cursor:pointer}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px max(24px,calc((100vw - 1230px)/2));border-bottom:1px solid #243a36;background:#101e1b}
+.brand{font-weight:800;letter-spacing:.03em;font-size:21px}.brand span{color:#79d9a9}.muted{color:#9bb1aa;font-size:13px}main{max-width:1230px;margin:0 auto;padding:27px 24px 70px}
+h1{font-size:29px;margin:0 0 5px}h2{font-size:16px;margin:0 0 15px}p{margin:4px 0}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:18px;align-items:center;margin-bottom:23px}
+.controls{display:flex;flex-wrap:wrap;gap:9px;align-items:center}button{border:1px solid #315149;border-radius:10px;background:#1a302a;color:#edf8f1;padding:10px 14px;font-weight:600}
+button.primary{background:#69d6a1;color:#092019;border-color:#69d6a1}button.danger{border-color:#94544c;background:#3a2323;color:#ffb8ad}button:disabled{opacity:.45;cursor:not-allowed}
+input,select{border:1px solid #315149;background:#14241f;color:#e9f1ed;border-radius:9px;padding:10px;max-width:220px}
+.panel{background:#13221e;border:1px solid #2b433b;border-radius:15px;padding:20px;min-width:0}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.card-label{font-size:12px;color:#9bb1aa;margin-bottom:10px}.value{font-size:29px;font-weight:750;line-height:1.15}.unit{font-size:13px;color:#a9bdb4}
+.section{margin-top:20px}.row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.badge{display:inline-flex;align-items:center;gap:7px;border-radius:40px;background:#244237;color:#91edbd;padding:7px 12px;font-size:12px;font-weight:800}
+.badge.off{background:#4b2c2b;color:#ffd2c8}.dot{width:8px;height:8px;background:currentColor;border-radius:50%}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:15px}.chart{height:218px;width:100%;display:block;margin-top:12px}
+.metric{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.kv{padding:11px 0;border-bottom:1px solid #2a4039;display:flex;justify-content:space-between;gap:10px;font-size:13px}
+.kv strong{font-variant-numeric:tabular-nums}.note{font-size:12px;color:#a4c7b6}
+#message{min-height:22px;font-size:13px}#message.error{color:#ffb4a9}
+table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;color:#aac0b5;font-weight:600}td,th{padding:11px 6px;border-bottom:1px solid #2a4039}
+.scroll{overflow:auto;max-height:315px}footer{margin-top:21px;color:#93aea2;font-size:12px}
+@media(max-width:880px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.charts{grid-template-columns:1fr}}@media(max-width:520px){.grid{grid-template-columns:1fr 1fr}.panel{padding:15px}.value{font-size:23px}.metric{grid-template-columns:1fr}header{padding:16px 22px}}
+</style>
+</head>
+<body>
+<header><div class="brand">◉ Pilz<span>Base</span> <span class="muted">/ MONITORING</span></div><div class="muted">RASPBERRY PI · STATION DASHBOARD</div></header>
+<main>
+<div class="top"><div><h1>Station overview</h1><p class="muted" id="identity">Connecting to local station…</p></div><div class="controls"><span id="badge" class="badge off"><span class="dot"></span><span id="status">Offline</span></span><button id="refresh">↻ Refresh</button></div></div>
+<div class="panel" style="margin-bottom:15px"><div class="row"><div><h2 style="margin:0 0 4px">Connection & controls</h2><span class="note">Token stays in this browser tab; served by the station itself.</span></div><div class="controls"><input type="password" id="token" autocomplete="off" placeholder="API bearer token" aria-label="API bearer token"><button id="connect">Connect</button><button class="primary" id="start" disabled>▶ Start experiment</button><button class="danger" id="stop" disabled>■ Stop</button></div></div><div id="message" role="status" aria-live="polite"></div></div>
+<div class="grid">
+<div class="panel"><div class="card-label">PT100 · TEMPERATURE 1</div><div class="value"><span id="temp">—</span> <span class="unit">°C</span></div></div>
+<div class="panel"><div class="card-label">CO₂ CONCENTRATION</div><div class="value"><span id="co2">—</span> <span class="unit">ppm</span></div></div>
+<div class="panel"><div class="card-label">RELATIVE HUMIDITY</div><div class="value"><span id="humidity">—</span> <span class="unit">%</span></div></div>
+<div class="panel"><div class="card-label">LASER DISTANCE</div><div class="value"><span id="laser">—</span> <span class="unit">mm</span></div></div>
+</div>
+<div class="section charts">
+<div class="panel"><div class="row"><h2>Temperature trend</h2><span class="note">PT100-1 · °C</span></div><canvas id="tempChart" class="chart" aria-label="Temperature trend"></canvas></div>
+<div class="panel"><div class="row"><h2>CO₂ trend</h2><span class="note">ppm</span></div><canvas id="co2Chart" class="chart" aria-label="CO2 trend"></canvas></div>
+</div>
+<div class="section charts">
+<div class="panel"><h2>Experiment details</h2><div class="metric">
+<div><div class="kv"><span>Station ID</span><strong id="station">—</strong></div><div class="kv"><span>Experiment ID</span><strong id="experiment">—</strong></div><div class="kv"><span>Measurement mode</span><strong id="mode">—</strong></div></div>
+<div><div class="kv"><span>Stored measurements</span><strong id="count">—</strong></div><div class="kv"><span>Start time (local)</span><strong id="begin">—</strong></div><div class="kv"><span>Planned end (local)</span><strong id="end">—</strong></div></div>
+</div><p class="note" style="margin-top:16px">The acquisition service works autonomously even when this dashboard is closed.</p></div>
+<div class="panel"><div class="row"><h2>Latest sensor readings</h2><span class="note" id="updated">No data</span></div><div class="metric" id="readings"></div></div>
+</div>
+<div class="section panel"><div class="row"><h2>Recent measurements</h2><div class="controls"><select id="window" aria-label="Chart data window"><option value="60">Last 60 records</option><option value="240" selected>Last 240 records</option><option value="1000">Last 1000 records</option><option value="5000">Last 5000 records</option></select><button id="csv">↓ Export CSV</button></div></div><div class="scroll"><table><thead><tr><th>Recorded (local)</th><th>PT100-1 °C</th><th>CO₂ ppm</th><th>Humidity %</th><th>Laser mm</th></tr></thead><tbody id="measurements"></tbody></table></div></div>
+<footer>Data source: local Raspberry Pi SQLite database · Updates every 15 seconds · Simulated readings are labelled in the station status.</footer>
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let token = sessionStorage.getItem("pilzbase-token") || "";
+let running = false, connected = false, recent = [];
+$("token").value = token;
+const labels = {pt100_1_c:"PT100-1",pt100_2_c:"PT100-2",pt100_3_c:"PT100-3",co2_ppm:"CO₂",air_temperature_c:"Air temperature",humidity_rh_pct:"Humidity",soil_voltage_v:"Soil voltage",laser_distance_mm:"Laser distance",light_raw:"Light (raw)",uv_raw:"UV (raw)"};
+const units = {pt100_1_c:"°C",pt100_2_c:"°C",pt100_3_c:"°C",co2_ppm:"ppm",air_temperature_c:"°C",humidity_rh_pct:"%",soil_voltage_v:"V",laser_distance_mm:"mm",light_raw:"",uv_raw:""};
+function fmt(v,n=1){return typeof v==="number" && Number.isFinite(v) ? v.toFixed(n) : "—"}
+function date(v){return v ? new Date(v).toLocaleString() : "—"}
+function message(s,error=false){$("message").textContent=s;$("message").className=error?"error":""}
+async function api(path,options={}){
+  const headers = {...(options.headers||{})};
+  if(token) headers.Authorization = "Bearer "+token;
+  const r=await fetch(path,{...options,headers,cache:"no-store"});
+  if(!r.ok){let detail="";try{detail=(await r.json()).detail||""}catch{}throw Error("HTTP "+r.status+(detail?": "+detail:""))}
+  return r;
+}
+function val(id,v,n=1){$(id).textContent=fmt(v,n)}
+function setOnline(yes,status){
+  $("badge").classList.toggle("off",!yes);
+  $("status").textContent=status;
+  $("start").disabled=!yes||running;
+  $("stop").disabled=!yes||!running;
+}
+function chart(id,rows,field,color){
+  const canvas=$(id),r=canvas.getBoundingClientRect(),ratio=window.devicePixelRatio||1;
+  canvas.width=Math.round(r.width*ratio);canvas.height=Math.round(r.height*ratio);
+  const c=canvas.getContext("2d");c.scale(ratio,ratio);
+  const w=r.width,h=r.height,pad={left:49,right:15,top:17,bottom:29},cw=w-pad.left-pad.right,ch=h-pad.top-pad.bottom;
+  const points=rows.map((row,i)=>({i,v:row.values[field]})).filter(p=>typeof p.v==="number"&&Number.isFinite(p.v));
+  c.font="11px system-ui";c.fillStyle="#a6bdb2";
+  if(points.length===0){c.fillText("No data yet",pad.left+20,h/2);return}
+  let min=Math.min(...points.map(p=>p.v)),max=Math.max(...points.map(p=>p.v));
+  if(max===min){min-=1;max+=1}
+  const margin=(max-min)*.12;min-=margin;max+=margin;
+  for(let i=0;i<4;i++){
+    const y=pad.top+(ch*i/3);c.strokeStyle="#2a4039";c.lineWidth=1;c.beginPath();c.moveTo(pad.left,y);c.lineTo(w-pad.right,y);c.stroke();
+    c.fillStyle="#a6bdb2";c.fillText((max-(max-min)*i/3).toFixed(1),5,y+4);
+  }
+  const x=i=>pad.left+(rows.length<=1?0:i/(rows.length-1)*cw);
+  const y=v=>pad.top+(max-v)/(max-min)*ch;
+  c.strokeStyle=color;c.lineWidth=2;c.beginPath();
+  // Do not bridge missing readings.
+  let inPath=false;
+  rows.forEach((row,i)=>{const v=row.values[field];if(typeof v!=="number"||!Number.isFinite(v)){inPath=false;return}
+    if(!inPath)c.moveTo(x(i),y(v));else c.lineTo(x(i),y(v));inPath=true;
+  });c.stroke();
+  c.fillStyle="#a6bdb2";
+  c.fillText(date(rows[0]?.acquired_at),pad.left,h-6);
+  const last=date(rows[rows.length-1]?.acquired_at);
+  const tw=c.measureText(last).width;c.fillText(last,Math.max(pad.left,w-tw-pad.right),h-6);
+}
+function drawCharts(){chart("tempChart",recent,"pt100_1_c","#6cdaa5");chart("co2Chart",recent,"co2_ppm","#7eb8f2")}
+function displayReadings(values={}){
+  const root=$("readings");root.replaceChildren();
+  Object.keys(labels).forEach(key=>{
+    const el=document.createElement("div"),line=document.createElement("div"),a=document.createElement("span"),b=document.createElement("strong");
+    line.className="kv";a.textContent=labels[key];b.textContent=fmt(values[key],key==="co2_ppm"?0:2)+" "+units[key];
+    line.append(a,b);el.append(line);root.append(el);
+  });
+}
+function displayTable(rows){
+  const body=$("measurements");body.replaceChildren();
+  [...rows].reverse().slice(0,50).forEach(row=>{
+    const tr=document.createElement("tr");
+    [date(row.acquired_at),fmt(row.values.pt100_1_c),fmt(row.values.co2_ppm,0),fmt(row.values.humidity_rh_pct),fmt(row.values.laser_distance_mm)].forEach(value=>{
+      const td=document.createElement("td");td.textContent=value;tr.append(td);
+    });body.append(tr);
+  });
+}
+async function refresh(){
+  try{
+    const result=await (await api("/api/v1/status")).json();
+    connected=true;running=result.state==="MEASURING";
+    setOnline(true,result.state);
+    $("identity").textContent=result.station_id+" · "+result.sensor_mode.toUpperCase()+" sensor mode";
+    $("station").textContent=result.station_id;
+    $("mode").textContent=result.sensor_mode;
+    $("count").textContent=Number(result.measurements||0).toLocaleString();
+    const e=result.experiment;
+    $("experiment").textContent=e?.id??"—";$("begin").textContent=date(e?.started_at);$("end").textContent=date(e?.ends_at);
+    const count=Number($("window").value);
+    // Read latest data without scanning the complete history: IDs monotonically increase on this station.
+    const offset=Math.max(0,Number(result.measurements||0)-count);
+    const payload=await (await api("/api/v1/measurements?after_id="+offset+"&limit="+count)).json();
+    recent=payload.rows||[];
+    const last=recent[recent.length-1];
+    const v=last?.values||{};
+    val("temp",v.pt100_1_c);val("co2",v.co2_ppm,0);val("humidity",v.humidity_rh_pct);val("laser",v.laser_distance_mm);
+    $("updated").textContent=last?"Last saved "+date(last.acquired_at):"No readings";
+    displayReadings(v);displayTable(recent);drawCharts();
+    message("");
+  }catch(err){
+    connected=false;running=false;setOnline(false,"Disconnected");
+    message("Connection failed: "+err.message,true);
+  }
+}
+async function control(action){
+  if(!confirm(action==="start"?"Start a new experiment?":"Stop the current experiment?"))return;
+  try{await api("/api/v1/experiments/"+action,{method:"POST"});await refresh()}
+  catch(err){message("Unable to "+action+": "+err.message,true)}
+}
+$("connect").onclick=()=>{token=$("token").value.trim();if(token)sessionStorage.setItem("pilzbase-token",token);else sessionStorage.removeItem("pilzbase-token");refresh()};
+$("refresh").onclick=refresh;$("window").onchange=refresh;
+$("start").onclick=()=>control("start");$("stop").onclick=()=>control("stop");
+$("csv").onclick=async()=>{
+  try{
+    $("csv").disabled=true;
+    const chunks=[],limit=5000;let after=0,header=null;
+    // Entire experiment, retrieved in bounded pages (max 5000).
+    for(let page=0;page<1000;page++){
+      const csv=await (await api("/api/v1/measurements.csv?after_id="+after+"&limit="+limit)).text();
+      const lines=csv.trimEnd().split(/\r?\n/);
+      if(!header)header=lines[0];
+      if(lines.length>1){chunks.push(lines.slice(1).join("\n"));const rows=await(await api("/api/v1/measurements?after_id="+after+"&limit="+limit)).json();
+        if(!rows.rows.length)break;after=rows.rows[rows.rows.length-1].id;
+        if(rows.rows.length<limit)break;
+      }else break;
+    }
+    const blob=new Blob([header+"\n"+chunks.join("\n")+"\n"],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="pilzbase-"+new Date().toISOString().slice(0,10)+".csv";a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
+  }catch(err){message("CSV export failed: "+err.message,true)}finally{$("csv").disabled=false}
+};
+window.addEventListener("resize",drawCharts);
+refresh();setInterval(refresh,15000);
+</script>
+</body>
+</html>
