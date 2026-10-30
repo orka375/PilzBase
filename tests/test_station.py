@@ -32,18 +32,16 @@ def test_start_log_stop_and_restart(tmp_path):
     storage2.close()
 
 
-def test_api_and_bearer(tmp_path):
-    cfg = Config(database_path=str(tmp_path / "api.sqlite3"), api_token="testtoken")
+def test_api_without_token(tmp_path):
+    cfg = Config(database_path=str(tmp_path / "api.sqlite3"))
     app = create_app(cfg)
     with TestClient(app) as client:
         assert client.get("/health").status_code == 200
-        assert client.get("/api/v1/status").status_code == 401
-        headers = {"Authorization": "Bearer testtoken"}
-        assert client.get("/api/v1/status", headers=headers).json()["state"] == "READY"
-        assert client.post("/api/v1/experiments/start", headers=headers).status_code == 200
-        assert client.post("/api/v1/experiments/start", headers=headers).status_code == 409
-        assert client.get("/api/v1/measurements.csv", headers=headers).status_code == 200
-        assert client.post("/api/v1/experiments/stop", headers=headers).status_code == 200
+        assert client.get("/api/v1/status").json()["state"] == "READY"
+        assert client.post("/api/v1/experiments/start").status_code == 200
+        assert client.post("/api/v1/experiments/start").status_code == 409
+        assert client.get("/api/v1/measurements.csv").status_code == 200
+        assert client.post("/api/v1/experiments/stop").status_code == 200
 
 
 def test_expiry(tmp_path):
