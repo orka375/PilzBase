@@ -1,12 +1,13 @@
 """Station HTTP API. Use a reverse proxy/TLS or trusted LAN/VPN for remote control."""
 from contextlib import asynccontextmanager
+from importlib.resources import files
 import asyncio
 import csv
 import io
 import secrets
 import logging
 from fastapi import Depends, FastAPI, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import uvicorn
 from .config import Config, load_config
@@ -36,6 +37,10 @@ def create_app(cfg: Config) -> FastAPI:
 
     app = FastAPI(title="PilzBase Station", version="0.1.0", lifespan=lifespan)
     app.state.engine = engine
+
+    @app.get('/', response_class=HTMLResponse, include_in_schema=False)
+    def dashboard():
+        return files('pilzbase').joinpath('dashboard.html').read_text(encoding='utf-8')
 
     def authorize(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
         if cfg.api_token and (credentials is None or
