@@ -9,7 +9,7 @@ Python 3.11+ autonomous logger for Raspberry Pi Zero 2 W. **Current version oper
 - Experiment start/stop/finish and automatic resume after service restart
 - Failed/invalid sensor values recorded as null with error details
 - Event log and paginated JSON/CSV exports
-- Bearer-token-protected REST API for future browser dashboard
+- Open REST API (no authentication; trusted LAN only)
 - systemd service and automated pytest tests
 
 ## Quick start (Pi or development computer)
@@ -19,25 +19,24 @@ python3 -m venv .venv
 . .venv/bin/activate
 pip install -e '.[test]'
 cp config.example.yaml config.yaml
-export PILZBASE_API_TOKEN='replace-with-long-random-secret'
 pilzbase
 ```
 
 The default API binds only to localhost. Open `http://127.0.0.1:8000/docs` for interactive API documentation.
 
 ```bash
-curl -H "Authorization: Bearer $PILZBASE_API_TOKEN" http://127.0.0.1:8000/api/v1/status
-curl -X POST -H "Authorization: Bearer $PILZBASE_API_TOKEN" http://127.0.0.1:8000/api/v1/experiments/start
-curl -H "Authorization: Bearer $PILZBASE_API_TOKEN" 'http://127.0.0.1:8000/api/v1/measurements?after_id=0&limit=1000'
-curl -H "Authorization: Bearer $PILZBASE_API_TOKEN" -o data.csv 'http://127.0.0.1:8000/api/v1/measurements.csv?after_id=0&limit=5000'
+curl http://127.0.0.1:8000/api/v1/status
+curl -X POST http://127.0.0.1:8000/api/v1/experiments/start
+curl 'http://127.0.0.1:8000/api/v1/measurements?after_id=0&limit=1000'
+curl -o data.csv 'http://127.0.0.1:8000/api/v1/measurements.csv?after_id=0&limit=5000'
 pytest -q
 ```
 
-For a trusted isolated LAN, set `api_host: 0.0.0.0` and supply a strong `PILZBASE_API_TOKEN`. **HTTP is not encrypted**; use TLS or VPN for communication beyond a trusted network. Do not expose the station directly to the public internet.
+For a trusted isolated LAN, set `api_host: 0.0.0.0` . **HTTP is not encrypted**; use TLS or VPN for communication beyond a trusted network. Do not expose the station directly to the public internet.
 
 ## Raspberry Pi service
 
-Use Raspberry Pi OS Lite with Python 3.11+. Clone into `/opt/pilzbase`; create a restricted `pilzbase` system user and virtual environment. Copy `config.example.yaml` to `/etc/pilzbase/config.yaml`, set `database_path: /var/lib/pilzbase/measurements.sqlite3`, and place `PILZBASE_API_TOKEN=...` in `/etc/pilzbase/secrets.env` (permissions 0600). Ensure the service user can read both files and write to the database directory. Install `deploy/pilzbase.service` in `/etc/systemd/system/`.
+Use Raspberry Pi OS Lite with Python 3.11+. Clone into `/opt/pilzbase`; create a restricted `pilzbase` system user and virtual environment. Copy `config.example.yaml` to `/etc/pilzbase/config.yaml`, set `database_path: /var/lib/pilzbase/measurements.sqlite3`. Ensure the service user can read the config file and write to the database directory. Install `deploy/pilzbase.service` in `/etc/systemd/system/`.
 
 ```bash
 sudo systemctl daemon-reload
@@ -47,7 +46,7 @@ journalctl -u pilzbase -f
 
 ## Browser dashboard
 
-Open `http://127.0.0.1:8000/` from the Pi (or `http://<pi-address>:8000/` when running on a trusted local network with `api_host: 0.0.0.0`). Enter the `PILZBASE_API_TOKEN` to connect. The page shows station status, latest values, temperature and CO₂ trends, start/stop controls, recent measurements and a full paginated CSV download. It polls the Pi every 15 seconds and works without external CDNs or internet access. The browser holds the token only in session storage for the current tab. Only one station is shown per dashboard; a future laptop dashboard will combine all five units. Avoid exposing the unencrypted HTTP API on untrusted networks.
+Open `http://127.0.0.1:8000/` from the Pi (or `http://<pi-address>:8000/` when running on a trusted local network with `api_host: 0.0.0.0`). The page shows station status, latest values, temperature and CO₂ trends, start/stop controls, recent measurements and a full paginated CSV download. It polls the Pi every 15 seconds and works without external CDNs or internet access. Only one station is shown per dashboard; a future laptop dashboard will combine all five units. Avoid exposing the unencrypted HTTP API on untrusted networks.
 
 ## API endpoints
 
@@ -72,4 +71,4 @@ Open `http://127.0.0.1:8000/` from the Pi (or `http://<pi-address>:8000/` when r
 
 ## Central five-station laptop dashboard
 
-Run the optional laptop-side control center to monitor **UNIT-01 through UNIT-05** from one browser. Each Raspberry Pi keeps recording autonomously. See [laptop setup instructions](laptop/README.md). The control center defaults to `http://127.0.0.1:8080/` on the laptop and proxies each Pi's authenticated REST API. Its group start/stop commands are best-effort, **not synchronized or atomic**.
+Run the optional laptop-side control center to monitor **UNIT-01 through UNIT-05** from one browser. Each Raspberry Pi keeps recording autonomously. See [laptop setup instructions](laptop/README.md). The control center defaults to `http://127.0.0.1:8080/` on the laptop and proxies each Pi's REST API. Its group start/stop commands are best-effort, **not synchronized or atomic**.
