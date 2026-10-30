@@ -58,12 +58,10 @@ def test_connect_and_remove(tmp_path, monkeypatch):
     monkeypatch.setattr(server, "fetch_station", fake)
     with TestClient(create_app(cfg)) as client:
         result = client.post("/api/stations/connect", json={
-            "id": "UNIT-01", "address": "unit01.local", "token": "secret"
+            "id": "UNIT-01", "address": "unit01.local"
         })
         assert result.status_code == 200, result.text
         assert len(client.get("/api/stations").json()["stations"]) == 1
-        assert cfg_file.with_suffix(".tokens.json").exists()
-        assert json.loads(cfg_file.with_suffix(".tokens.json").read_text())["UNIT-01"] == "secret"
         assert load_config(str(cfg_file))["stations"]["UNIT-01"] == "http://unit01.local:8000"
         assert client.delete("/api/stations/UNIT-01").status_code == 200
         assert client.get("/api/stations").json()["stations"] == []
