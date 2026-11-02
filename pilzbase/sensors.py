@@ -13,6 +13,8 @@ FIELDS = (
     "laser_distance_mm", "light_raw", "uv_raw",
     "battery_voltage_v", "battery_current_ma", "battery_power_w",
     "battery_capacity_est_pct",
+    "bme280_temperature_c", "bme280_humidity_pct", "bme280_pressure_hpa",
+    "ens160_aqi", "ens160_tvoc_ppb", "ens160_eco2_ppm", "laser_current_ma",
 )
 
 class SensorSource(Protocol):
