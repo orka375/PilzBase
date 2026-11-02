@@ -10,7 +10,8 @@ import time
 FIELDS = (
     "pt100_1_c", "pt100_2_c", "pt100_3_c", "co2_ppm",
     "air_temperature_c", "humidity_rh_pct", "soil_voltage_v",
-    "laser_distance_mm", "color_clear_raw", "color_red_raw",\n    "color_green_raw", "color_blue_raw",
+    "laser_distance_mm", "color_clear_raw", "color_red_raw",
+    "color_green_raw", "color_blue_raw",
     "battery_voltage_v", "battery_current_ma", "battery_power_w",
     "battery_capacity_est_pct",
     "bme280_temperature_c", "bme280_humidity_pct", "bme280_pressure_hpa",
