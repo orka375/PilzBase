@@ -19,10 +19,10 @@ command -v systemctl >/dev/null || die "systemd is required."
 
 say "Installing system Python packages (no virtual environment)"
 sudo apt-get update
-sudo apt-get install -y git curl python3 python3-fastapi python3-uvicorn python3-yaml python3-gpiozero
+sudo apt-get install -y git curl python3 python3-fastapi python3-uvicorn python3-yaml python3-gpiozero python3-smbus i2c-tools
 
 say "Checking system Python dependencies"
-if ! /usr/bin/python3 -c 'import fastapi, uvicorn, yaml, gpiozero'; then
+if ! /usr/bin/python3 -c 'import fastapi, uvicorn, yaml, gpiozero, smbus'; then
   die "A required Python package cannot be imported by /usr/bin/python3."
 fi
 
