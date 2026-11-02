@@ -34,15 +34,38 @@ pytest -q
 
 For a trusted isolated LAN, set `api_host: 0.0.0.0` . **HTTP is not encrypted**; use TLS or VPN for communication beyond a trusted network. Do not expose the station directly to the public internet.
 
-## Raspberry Pi service
+## Raspberry Pi installation: system Python, single home folder (no venv)
 
-Use Raspberry Pi OS Lite with Python 3.11+. Clone into `/opt/pilzbase`; create a restricted `pilzbase` system user and virtual environment. Copy `config.example.yaml` to `/etc/pilzbase/config.yaml`, set `database_path: /var/lib/pilzbase/measurements.sqlite3`. Ensure the service user can read the config file and write to the database directory. Install `deploy/pilzbase.service` in `/etc/systemd/system/`.
+On Raspberry Pi OS Lite, install dependencies using APT, not global pip (PEP 668):
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now pilzbase
-journalctl -u pilzbase -f
+sudo apt update
+sudo apt install -y git python3-fastapi python3-uvicorn python3-yaml python3-gpiozero
+cd ~
+git clone https://github.com/orka375/PilzBase.git
+cd ~/PilzBase
+cp -n config.example.yaml config.yaml
+cp -n hardware.example.yaml hardware.yaml
+mkdir -p data ~/.config/systemd/user
 ```
+
+In `~/PilzBase/config.yaml` set `database_path: ./data/measurements.sqlite3`, `hardware_config_path: hardware.yaml`, your station ID, and `api_host: 0.0.0.0` if you need LAN access. The GPIO assignments are in `~/PilzBase/hardware.yaml`; button/LED are disabled until wiring is verified.
+
+```bash
+/usr/bin/python3 -c 'import fastapi, uvicorn, yaml, gpiozero; print("Python packages OK")'
+sudo cp ~/PilzBase/deploy/pilzbase.service ~/.config/systemd/user/pilzbase.service
+systemctl --user daemon-reload
+systemctl --user enable --now pilzbase
+sudo loginctl enable-linger "$USER"
+systemctl --user status pilzbase
+journalctl --user -u pilzbase -f
+```
+
+**Note:** Do not use sudo on the `systemctl --user` commands, and do not install this file to `/etc/systemd/system`. The service runs as your normal login user and starts at boot after `enable-linger`. Test foreground startup with `cd ~/PilzBase && PILZBASE_CONFIG="$HOME/PilzBase/config.yaml" /usr/bin/python3 -m pilzbase.app` before enabling the service if desired. If an old system-wide service exists, stop/disable it first: `sudo systemctl disable --now pilzbase` (only if installed).
+
+When updating code: `cd ~/PilzBase && git pull && systemctl --user restart pilzbase`.
+
+Keep the Pi on a trusted isolated LAN because the API has no authentication.
 
 ## Browser dashboard
 
@@ -75,14 +98,14 @@ Run the optional laptop-side control center to monitor **UNIT-01 through UNIT-05
 
 ## Physical button, single-colour status LED, and hardware pin configuration
 
-Copy `hardware.example.yaml` to `/etc/pilzbase/hardware.yaml` and configure the actual **BCM GPIO numbers** from your verified Fusion 360 schematic. Then set `hardware_config_path: /etc/pilzbase/hardware.yaml` in `/etc/pilzbase/config.yaml` and restart the service.
+Copy `hardware.example.yaml` to `~/PilzBase/hardware.yaml` and configure the actual **BCM GPIO numbers** from your verified Fusion 360 schematic. Then set `hardware_config_path: hardware.yaml` in `~/PilzBase/config.yaml` and restart the user service.
 
 ```bash
-sudo cp /opt/pilzbase/hardware.example.yaml /etc/pilzbase/hardware.yaml
-sudo nano /etc/pilzbase/hardware.yaml
-sudo nano /etc/pilzbase/config.yaml
-sudo systemctl restart pilzbase
-sudo journalctl -u pilzbase -n 50 --no-pager
+cd ~/PilzBase
+nano hardware.yaml
+nano config.yaml
+systemctl --user restart pilzbase
+journalctl --user -u pilzbase -n 50 --no-pager
 ```
 
 Set both `button.enabled` and `led.enabled` to `true` **only when correctly wired**. The proposed GPIO17 button and GPIO27 LED are *not verified against the current PCB*. Wire the normally-open button between GPIO and GND with a pull-up, and connect the single-colour LED with a suitable current-limiting resistor (for example, 1 kΩ) from GPIO to GND for active-high output.
@@ -95,4 +118,4 @@ Behavior:
 - Sensors are still simulated. The `sensors` block documents **planned** SPI/I²C/ADC addresses; it does not yet activate sensor drivers.
 - The latest design intentionally does not permit a physical button to start a new experiment after STOPPED/FINISHED; use the dashboard to create a new experiment.
 
-The station service must have GPIO access. On Raspberry Pi OS this usually means adding the `pilzbase` user to the `gpio` group (`sudo usermod -aG gpio pilzbase`), then restarting the service. Install `gpiozero` (provided by the project dependencies) and ensure a working Pi GPIO pin factory is available. Keep the GPIO enabled settings off for host-based tests.
+The station service must have GPIO access. On Raspberry Pi OS this usually means ensuring your login user has GPIO access (check `groups`; if required, `sudo usermod -aG gpio "$USER"` followed by logout/login). Install `gpiozero` through APT and ensure a working Pi GPIO pin factory is available. Keep the GPIO enabled settings off for host-based tests.
