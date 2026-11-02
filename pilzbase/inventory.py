@@ -60,9 +60,6 @@ def inventory(config, mode, latest=None, probe=False):
         available = {field: values.get(field) for field in fields if values.get(field) is not None}
         if latest and latest.get("simulated") and key != "ups_hat_c":
             available = {}
-        if latest and latest.get("simulated") and key == "ups_hat_c":
-            # UPS data may be real even in simulated mode; it is read separately.
-            pass
         if mode == "simulated" and key != "ups_hat_c":
             available = {}
         # Do not claim detection based on simulated values or unverified address ACK.
