@@ -48,6 +48,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;colo
 <div><div class="card-label">BATTERY POWER</div><div class="value"><span id="batteryPower">—</span> <span class="unit">W</span></div></div>
 <div><div class="card-label">CAPACITY ESTIMATE</div><div class="value"><span id="batteryPercent">—</span> <span class="unit">%</span></div></div>
 </div><p class="note">Negative current generally means discharging; positive means charging. Percent is approximate and inaccurate while charging. A dash indicates no battery measurement.</p></div>
+<section class="section panel"><div class="row"><div><h2>Sensor overview</h2><p class="note">Configured devices, physical reading status, and latest measurements. Values from simulated mode do not prove a sensor is connected.</p></div><span id="sensorMode" class="badge">—</span></div><div class="scroll" style="max-height:560px"><table><thead><tr><th>Type</th><th>Exact model</th><th>Connection</th><th>Status</th><th>Values</th></tr></thead><tbody id="sensorOverview"><tr><td colspan="5">Loading…</td></tr></tbody></table></div></section>
 <div class="section charts">
 <div class="panel"><div class="row"><h2>Temperature trend</h2><span class="note">PT100-1 · °C</span></div><canvas id="tempChart" class="chart" aria-label="Temperature trend"></canvas></div>
 <div class="panel"><div class="row"><h2>CO₂ trend</h2><span class="note">ppm</span></div><canvas id="co2Chart" class="chart" aria-label="CO2 trend"></canvas></div>
@@ -131,10 +132,26 @@ function displayTable(rows){
     });body.append(tr);
   });
 }
+async function sensorOverview(){
+  const result=await (await api("/api/v1/sensors")).json();
+  $("sensorMode").textContent="Mode: "+result.sensor_mode;
+  const body=$("sensorOverview");body.replaceChildren();
+  const unitMap={pt100_1_c:"°C",pt100_2_c:"°C",laser_distance_mm:"mm",laser_current_ma:"mA",soil_voltage_v:"V",bme280_temperature_c:"°C",bme280_humidity_pct:"%",bme280_pressure_hpa:"hPa",ens160_aqi:"",ens160_tvoc_ppb:"ppb",ens160_eco2_ppm:"ppm",co2_ppm:"ppm",air_temperature_c:"°C",humidity_rh_pct:"%",battery_voltage_v:"V",battery_current_ma:"mA",battery_power_w:"W",battery_capacity_est_pct:"%"};
+  for(const s of result.sensors){
+    const tr=document.createElement("tr");
+    const values=Object.entries(s.values||{}).map(([k,v])=>k.replaceAll("_"," ")+": "+fmt(v,2)+" "+(unitMap[k]||"")).join(" · ")||"—";
+    for(const value of [s.type,s.model,s.connection,s.status.replaceAll("_"," "),values]){
+      const td=document.createElement("td");td.textContent=value;tr.append(td);
+    }
+    tr.title=s.detail;body.append(tr);
+    const details=document.createElement("tr"),cell=document.createElement("td");cell.colSpan=5;cell.className="note";cell.textContent=s.detail;details.append(cell);body.append(details);
+  }
+}
 async function refresh(){
   try{
     const result=await (await api("/api/v1/status")).json();
     connected=true;running=result.state==="MEASURING";
+    try{await sensorOverview()}catch(e){$("sensorOverview").textContent="Sensor inventory unavailable: "+e.message}
     setOnline(true,result.state);
     $("identity").textContent=result.station_id+" · "+result.sensor_mode.toUpperCase()+" sensor mode";
     $("station").textContent=result.station_id;
