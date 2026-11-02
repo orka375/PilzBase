@@ -136,7 +136,7 @@ async function sensorOverview(){
   const result=await (await api("/api/v1/sensors")).json();
   $("sensorMode").textContent="Mode: "+result.sensor_mode;
   const body=$("sensorOverview");body.replaceChildren();
-  const unitMap={pt100_1_c:"°C",pt100_2_c:"°C",laser_distance_mm:"mm",laser_current_ma:"mA",soil_voltage_v:"V",bme280_temperature_c:"°C",bme280_humidity_pct:"%",bme280_pressure_hpa:"hPa",ens160_aqi:"",ens160_tvoc_ppb:"ppb",ens160_eco2_ppm:"ppm",co2_ppm:"ppm",air_temperature_c:"°C",humidity_rh_pct:"%",battery_voltage_v:"V",battery_current_ma:"mA",battery_power_w:"W",battery_capacity_est_pct:"%"};
+  const unitMap={color_clear_raw:"counts",color_red_raw:"counts",color_green_raw:"counts",color_blue_raw:"counts",pt100_1_c:"°C",pt100_2_c:"°C",laser_distance_mm:"mm",laser_current_ma:"mA",soil_voltage_v:"V",bme280_temperature_c:"°C",bme280_humidity_pct:"%",bme280_pressure_hpa:"hPa",ens160_aqi:"",ens160_tvoc_ppb:"ppb",ens160_eco2_ppm:"ppm",co2_ppm:"ppm",air_temperature_c:"°C",humidity_rh_pct:"%",battery_voltage_v:"V",battery_current_ma:"mA",battery_power_w:"W",battery_capacity_est_pct:"%"};
   for(const s of result.sensors){
     const tr=document.createElement("tr");
     const values=Object.entries(s.values||{}).map(([k,v])=>k.replaceAll("_"," ")+": "+fmt(v,2)+" "+(unitMap[k]||"")).join(" · ")||"—";
