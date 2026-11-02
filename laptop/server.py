@@ -15,7 +15,7 @@ from pathlib import Path
 import re
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import Request as URLRequest, urlopen
 
 import uvicorn
 import yaml
@@ -59,7 +59,7 @@ def fetch_station(sid, base_url, path, method="GET", *, timeout=4):
     class NoRedirect(HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
             return None
-    req = Request(base_url + path, method=method)
+    req = URLRequest(base_url + path, method=method)
     try:
         with build_opener(NoRedirect).open(req, timeout=timeout) as response:
             body = response.read(2_000_000)
