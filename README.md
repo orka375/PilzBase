@@ -149,3 +149,25 @@ ups_hat_c:
 ```
 
 Install I²C tools and driver: `sudo apt install -y python3-smbus i2c-tools`; enable I²C using `sudo raspi-config` and inspect `i2cdetect -y 1` to verify the INA219 address before enabling. Restart with `systemctl --user restart pilzbase`. The station dashboard and measurement JSON/CSV expose battery voltage, signed current, power and **voltage-based estimated percentage** during experiments. When the HAT is disabled or I²C fails the battery fields remain null. This measurement is not a calibrated fuel-gauge reading; percent is particularly unreliable while charging. All other sensor channels currently remain simulated.
+
+## 2026-11 hardware inventory and activation
+
+See `hardware.example.yaml` for full wiring map. **Confirmed BCM GPIO**: pushbutton 16, LED 19, relay 2 output 20. **Relay 2 HIGH turns laser OFF; LOW turns laser ON.** Relay driving is disabled by default: verify output polarity, optocoupler/relay supply voltage, and a hardware pull-up or equivalent failsafe. GPIO is not guaranteed to be HIGH before Raspberry Pi boot, so software-only laser interlock is not sufficient.
+
+| Signal | Connection | Configuration |
+|---|---|---|
+| PT100 #1, PT100 #2 | MAX31865 via SPI0 CE0 GPIO8 / CE1 GPIO7 (proposed) | `pt100_1`, `pt100_2` |
+| Laser optoNCDT 1220 | 4–20mA through verified shunt → DFR0553 ADS1115 A1 (proposed) | `opto_1220`; configure actual 4mA and 20mA *distance* values |
+| Grove resistive soil moisture | Analog output → ADS1115 A0 (proposed) | `grove_soil`; moisture stored as raw volts pending calibration |
+| DFRobot DFR0553 | I²C1 address 0x48 | `dfr0553` |
+| DFRobot SEN0335 ENS160/BME280 | I²C1 0x53 ENS160 / 0x76 BME280 | `ens160`, `bme280` |
+| Sensirion SCD41 | I²C1 0x62 | `scd41` |
+| Waveshare UPS HAT (C) INA219 | I²C1 0x43 (check on hardware) | `ups_hat_c` |
+
+The SPI chip-select assignments and ADC channels are **provisional**, not confirmed PCB connections. For I²C1 use GPIO2/SDA (physical pin 3) and GPIO3/SCL (physical pin 5). All devices must share GND, and the bus must use 3.3 V-safe logic levels.
+
+The real readers are opt-in; example `enabled: false` prevents accidental use on unverified hardware. To switch from test data to the sensor drivers, set `sensor_mode: hardware` in `config.yaml`, then selectively enable tested devices in `hardware.yaml`. In hardware mode, **disabled or failed sensors are null, not simulated**, and the database row is marked `simulated=0`. The real-sensor drivers are an initial implementation, **not yet validated on the Raspberry Pi or calibrated**. Check I²C with `sudo i2cdetect -y 1` and SPI settings through `sudo raspi-config`.
+
+Additional Python system packages for readers: `sudo apt install python3-spidev python3-smbus i2c-tools`; BME280 reader imports the `bme280` package and SCD41 reader imports `smbus2`, which must be available to your system Python before enabling those channels. Availability and package names vary by Raspberry Pi OS release. ENS160 eCO₂ is a **gas-sensor estimate** and must not be presented as equivalent to the directly measured CO₂ from SCD41.
+
+Laser output should be enabled only when a test experiment is active. The GPIO software implements this best-effort rule, but it is **not a hard real-time interlock**; test the relay's electrical failsafe before using the laser, and do not enable it during initial installation.
