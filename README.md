@@ -171,3 +171,20 @@ The real readers are opt-in; example `enabled: false` prevents accidental use on
 Additional Python system packages for readers: `sudo apt install python3-spidev python3-smbus i2c-tools`; BME280 reader imports the `bme280` package and SCD41 reader imports `smbus2`, which must be available to your system Python before enabling those channels. Availability and package names vary by Raspberry Pi OS release. ENS160 eCO₂ is a **gas-sensor estimate** and must not be presented as equivalent to the directly measured CO₂ from SCD41.
 
 Laser output should be enabled only when a test experiment is active. The GPIO software implements this best-effort rule, but it is **not a hard real-time interlock**; test the relay's electrical failsafe before using the laser, and do not enable it during initial installation.
+
+
+### CJMCU-34725 color/light sensor
+
+The CJMCU-34725 board (TCS34725) replaces the former separate light/UV
+placeholders. It reports **raw clear, red, green, blue counts**; it does **not**
+measure UV, and the raw counts are not calibrated lux. Connect SDA to GPIO2
+(physical pin 3), SCL to GPIO3 (pin 5), GND to common ground, and power to a
+voltage supported by the *specific breakout* and Raspberry Pi 3.3 V I²C logic.
+Its usual 7-bit I²C address is **0x29**.
+
+In `hardware.yaml`, under `sensors:`, add
+`cjmcu_34725: {enabled: true, interface: i2c, bus: 1, address: 0x29}`
+and set `sensor_mode: hardware` in `config.yaml`. Only enable after the
+I²C bus scan behaves normally; a scan returning *every* address indicates a
+bus fault. Reboot/restart the station service and start an experiment to see
+RGBC fields in the laptop HMI.
