@@ -79,7 +79,8 @@ class Engine:
                 value = values.get(field)
                 if value is None:
                     cleaned[field] = None
-                    errors.setdefault(field, "missing reading")
+                    if not field.startswith("battery_"):
+                        errors.setdefault(field, "missing reading")
                 elif isinstance(value, bool) or not isinstance(value, (int,float)) or not math.isfinite(value):
                     cleaned[field] = None
                     errors[field] = "invalid reading"
