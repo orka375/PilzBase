@@ -73,13 +73,13 @@ class Storage:
         row = self.db.execute("SELECT COALESCE(MAX(cycle),0)+1 FROM measurements WHERE experiment_id=?", (experiment_id,)).fetchone()
         return row[0]
 
-    def save(self, experiment_id: int, cycle: int, scheduled: str, values: dict, errors: dict):
+    def save(self, experiment_id: int, cycle: int, scheduled: str, values: dict, errors: dict, simulated: bool = True):
         normalized = {name: values.get(name) for name in FIELDS}
         with self.db:
             self.db.execute("""INSERT INTO measurements
                 (experiment_id,scheduled_at,acquired_at,cycle,simulated,values_json,errors_json)
-                VALUES (?,?,?,?,1,?,?)""",
-                (experiment_id,scheduled,utc_now(),cycle,json.dumps(normalized,allow_nan=False),json.dumps(errors)))
+                VALUES (?,?,?,?,?,?,?)""",
+                (experiment_id,scheduled,utc_now(),cycle,int(simulated),json.dumps(normalized,allow_nan=False),json.dumps(errors)))
 
     def rows(self, after_id: int = 0, limit: int = 1000):
         result = self.db.execute("SELECT * FROM measurements WHERE id>? ORDER BY id LIMIT ?", (after_id,limit)).fetchall()
