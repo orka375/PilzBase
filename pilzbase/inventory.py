@@ -3,9 +3,6 @@
 I2C identification is by *address ACK only*, not a validated device identity.
 Do not scan every address: a stuck SDA line can make every address appear.
 """
-from pathlib import Path
-from datetime import datetime, timezone
-import time
 
 DEVICES = [
  ("pt100_1", "Temperature", "MAX31865 #1 + PT100", "SPI0 CE0 (proposed)", ["pt100_1_c"]),
@@ -61,6 +58,8 @@ def inventory(config, mode, latest=None, probe=False):
         elif key in ("opto_1220", "grove_soil"):
             connection = f"DFR0553 A{cfg.get('adc_channel', '?')} (verify wiring)"
         available = {field: values.get(field) for field in fields if values.get(field) is not None}
+        if mode == "simulated" and key != "ups_hat_c":
+            available = {}
         # Do not claim detection based on simulated values or unverified address ACK.
         if mode == "simulated" and key != "ups_hat_c":
             status = "disabled" if not enabled else "not_checked"
