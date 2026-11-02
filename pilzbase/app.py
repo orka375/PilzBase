@@ -15,6 +15,7 @@ from .storage import Storage
 from .hardware import HardwareController, load_hardware
 from .ups import UPSHatC
 from .physical_sensors import PhysicalSensors
+from .inventory import inventory
 
 log = logging.getLogger(__name__)
 
@@ -74,6 +75,12 @@ def create_app(cfg: Config) -> FastAPI:
     @app.get("/api/v1/status")
     def status():
         return engine.status()
+
+    @app.get("/api/v1/sensors")
+    def sensor_overview():
+        rows = store.rows(max(0, store.count() - 1), 1)
+        latest = rows[-1] if rows else None
+        return inventory(hardware_config, cfg.sensor_mode, latest)
 
     @app.post("/api/v1/experiments/start")
     def start():
