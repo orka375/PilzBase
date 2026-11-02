@@ -15,5 +15,6 @@ sensors:
   bme280: {enabled: false, interface: i2c, bus: 1, address: 0x76}
   ens160: {enabled: false, interface: i2c, bus: 1, address: 0x53}
   scd41: {enabled: false, interface: i2c, bus: 1, address: 0x62}
+  cjmcu_34725: {enabled: false, interface: i2c, bus: 1, address: 0x29}  # TCS34725 RGBC, no UV
 ups_hat_c: {enabled: false, bus: 1, address: 0x43}
 # All sensor enable flags default OFF until real wiring and calibration verified.
