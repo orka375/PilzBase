@@ -53,7 +53,7 @@ In `~/PilzBase/config.yaml` set `database_path: ./data/measurements.sqlite3`, `h
 
 ```bash
 /usr/bin/python3 -c 'import fastapi, uvicorn, yaml, gpiozero; print("Python packages OK")'
-sudo cp ~/PilzBase/deploy/pilzbase.service ~/.config/systemd/user/pilzbase.service
+cp ~/PilzBase/deploy/pilzbase.service ~/.config/systemd/user/pilzbase.service
 systemctl --user daemon-reload
 systemctl --user enable --now pilzbase
 sudo loginctl enable-linger "$USER"
