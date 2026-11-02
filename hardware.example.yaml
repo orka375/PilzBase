@@ -1,0 +1,24 @@
+# BCM GPIO numbering. These are proposed pins, verify with Fusion 360 schematic.
+button:
+  enabled: false  # Change to true only after wiring has been verified
+  gpio: 17
+  pull_up: true
+  debounce_ms: 50
+  long_press_seconds: 3
+led:
+  enabled: false
+  gpio: 27
+  active_high: true
+  status_timeout_seconds: 10
+# Sensor pins are documentation until real drivers are integrated.
+# null means not yet assigned; DO NOT guess physical wiring.
+sensors:
+  pt100_1: {interface: spi, bus: 0, cs_gpio: 8}
+  pt100_2: {interface: spi, bus: 0, cs_gpio: 7}
+  pt100_3: {interface: spi, bus: 0, cs_gpio: null}
+  scd41: {interface: i2c, bus: 1, address: 0x62}
+  ads1115: {interface: i2c, bus: 1, address: null}
+  soil_moisture: {interface: ads1115, channel: 0}
+  laser: {interface: ads1115, channel: 1}
+  light: {interface: i2c, bus: 1, address: null}
+  uv: {interface: i2c, bus: 1, address: null}
