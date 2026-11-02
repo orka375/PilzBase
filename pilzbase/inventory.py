@@ -12,6 +12,7 @@ DEVICES = [
  ("grove_soil", "Soil moisture", "Seeed Grove Soil Moisture Sensor", "DFR0553 A0 (proposed)", ["soil_voltage_v"]),
  ("bme280", "Environment", "Bosch BME280 (DFRobot module)", "I²C1 0x76", ["bme280_temperature_c", "bme280_humidity_pct", "bme280_pressure_hpa"]),
  ("ens160", "Air quality", "ScioSense ENS160 (DFRobot module)", "I²C1 0x53", ["ens160_aqi", "ens160_tvoc_ppb", "ens160_eco2_ppm"]),
+ ("cjmcu_34725", "Color / light", "CJMCU-34725 / TCS34725", "I²C1 0x29", ["color_clear_raw", "color_red_raw", "color_green_raw", "color_blue_raw"]),
  ("scd41", "CO₂", "Sensirion SCD41", "I²C1 0x62", ["co2_ppm", "air_temperature_c", "humidity_rh_pct"]),
  ("ups_hat_c", "Power", "Waveshare UPS HAT (C) / INA219", "I²C1 0x43", ["battery_voltage_v", "battery_current_ma", "battery_power_w", "battery_capacity_est_pct"]),
 ]
@@ -22,7 +23,7 @@ def _bus_status(config):
     wanted = {}
     for key, _, _, _, _ in DEVICES:
         cfg = config.get("ups_hat_c", {}) if key == "ups_hat_c" else config.get("sensors", {}).get(key, {})
-        if cfg.get("interface", "i2c") == "i2c" and key in ("dfr0553", "bme280", "ens160", "scd41", "ups_hat_c"):
+        if cfg.get("interface", "i2c") == "i2c" and key in ("dfr0553", "bme280", "ens160", "scd41", "cjmcu_34725", "ups_hat_c"):
             wanted[(int(cfg.get("bus", 1)), int(cfg.get("address", 0x43 if key == "ups_hat_c" else 0)))] = None
     for bus_id, address in list(wanted):
         try:
@@ -49,8 +50,8 @@ def inventory(config, mode, latest=None, probe=False):
         if key in ("opto_1220", "grove_soil"):
             enabled = enabled and bool(sensors.get("dfr0553", {}).get("enabled"))
         connection = default_connection
-        if key in ("dfr0553", "bme280", "ens160", "scd41", "ups_hat_c"):
-            address = int(cfg.get("address", {"dfr0553":0x48,"bme280":0x76,"ens160":0x53,"scd41":0x62,"ups_hat_c":0x43}[key]))
+        if key in ("dfr0553", "bme280", "ens160", "scd41", "cjmcu_34725", "ups_hat_c"):
+            address = int(cfg.get("address", {"dfr0553":0x48,"bme280":0x76,"ens160":0x53,"scd41":0x62,"cjmcu_34725":0x29,"ups_hat_c":0x43}[key]))
             bus = int(cfg.get("bus", 1))
             connection = f"I²C{bus} 0x{address:02X}"
         elif key.startswith("pt100_"):
@@ -76,8 +77,8 @@ def inventory(config, mode, latest=None, probe=False):
             status, detail = "error", str(errors[key])
         else:
             status, detail = "not_checked", "No successful physical measurement yet"
-        if probe and key in ("dfr0553", "bme280", "ens160", "scd41", "ups_hat_c"):
-            ack = checks.get((int(cfg.get("bus",1)), int(cfg.get("address",{"dfr0553":0x48,"bme280":0x76,"ens160":0x53,"scd41":0x62,"ups_hat_c":0x43}[key]))))
+        if probe and key in ("dfr0553", "bme280", "ens160", "scd41", "cjmcu_34725", "ups_hat_c"):
+            ack = checks.get((int(cfg.get("bus",1)), int(cfg.get("address",{"dfr0553":0x48,"bme280":0x76,"ens160":0x53,"scd41":0x62,"cjmcu_34725":0x29,"ups_hat_c":0x43}[key]))))
             if ack is True:
                 detail += "; I²C address responded (identity unverified)"
             elif ack is False:
