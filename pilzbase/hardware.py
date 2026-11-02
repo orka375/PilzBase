@@ -111,17 +111,23 @@ class HardwareController:
         self.config = config
         self.button = None
         self.led = None
+        self.laser_relay = None
 
     async def run(self):
         btn_cfg = self.config.get("button", {})
         led_cfg = self.config.get("led", {})
-        if not (btn_cfg.get("enabled") or led_cfg.get("enabled")):
+        relay_cfg = self.config.get("relays", {}).get("relay_2", {})
+        if not (btn_cfg.get("enabled") or led_cfg.get("enabled") or relay_cfg.get("enabled")):
             return
         try:
             from gpiozero import Button, LED
         except ImportError as exc:
             raise RuntimeError("Install gpiozero to enable physical button/LED") from exc
         try:
+            if relay_cfg.get("enabled"):
+                from gpiozero import OutputDevice
+                # Assert OFF before any laser measurement is permitted.
+                self.laser_relay = OutputDevice(relay_cfg["gpio"], active_high=True, initial_value=True)
             if btn_cfg.get("enabled"):
                 self.button = Button(btn_cfg["gpio"], pull_up=btn_cfg.get("pull_up", True),
                                      bounce_time=float(btn_cfg.get("debounce_ms", 50))/1000)
@@ -138,8 +144,14 @@ class HardwareController:
                         self.led.on() if logic.output(now) else self.led.off()
                 except Exception:
                     log.exception("Button/LED handling failed")
+                if self.laser_relay:
+                    # Laser is enabled only while an experiment is MEASURING.
+                    self.laser_relay.off() if self.engine.status()["state"] == "MEASURING" else self.laser_relay.on()
                 await asyncio.sleep(0.05)
         finally:
+            if self.laser_relay:
+                self.laser_relay.on()  # safest possible state during orderly shutdown
+                self.laser_relay.close()
             if self.led:
                 self.led.off()
                 self.led.close()
