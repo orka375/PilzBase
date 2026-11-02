@@ -12,6 +12,7 @@ from .config import Config, load_config
 from .engine import Engine
 from .sensors import SimulatedSensors, FIELDS
 from .storage import Storage
+from .hardware import HardwareController, load_hardware
 
 log = logging.getLogger(__name__)
 
@@ -20,14 +21,23 @@ def create_app(cfg: Config) -> FastAPI:
     store = Storage(cfg.database_path)
     engine = Engine(store, SimulatedSensors(), cfg.station_id, cfg.interval_seconds, cfg.duration_days)
 
+    hardware_config = load_hardware(cfg.hardware_config_path) if cfg.hardware_config_path else {}
+    hardware = HardwareController(engine, hardware_config)
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         store.log("INFO", "BOOT", "Station software started")
         task = asyncio.create_task(engine.run())
+        hw_task = asyncio.create_task(hardware.run())
         try:
             yield
         finally:
             engine.shutdown()
+            hw_task.cancel()
+            try:
+                await hw_task
+            except asyncio.CancelledError:
+                pass
             await task
             store.log("INFO", "SHUTDOWN", "Station software stopped")
             store.close()
