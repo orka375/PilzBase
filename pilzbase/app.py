@@ -14,6 +14,7 @@ from .sensors import SimulatedSensors, FIELDS
 from .storage import Storage
 from .hardware import HardwareController, load_hardware
 from .ups import UPSHatC
+from .physical_sensors import PhysicalSensors
 
 log = logging.getLogger(__name__)
 
@@ -25,9 +26,11 @@ def create_app(cfg: Config) -> FastAPI:
     ups_cfg = hardware_config.get("ups_hat_c", {})
     ups = UPSHatC(ups_cfg.get("bus", 1), ups_cfg.get("address", 0x43)) if ups_cfg.get("enabled", False) else None
 
+    physical = PhysicalSensors(hardware_config) if cfg.sensor_mode == "hardware" else None
+
     class StationSensors:
         def read(self):
-            values = SimulatedSensors().read()
+            values = physical.read() if physical else SimulatedSensors().read()
             if ups:
                 try:
                     values.update(ups.read())
