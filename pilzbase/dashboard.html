@@ -68,8 +68,8 @@ const $ = id => document.getElementById(id);
 
 let running = false, connected = false, recent = [];
 
-const labels = {pt100_1_c:"PT100-1",pt100_2_c:"PT100-2",pt100_3_c:"PT100-3",co2_ppm:"CO₂",air_temperature_c:"Air temperature",humidity_rh_pct:"Humidity",soil_voltage_v:"Soil voltage",laser_distance_mm:"Laser distance",light_raw:"Light (raw)",uv_raw:"UV (raw)",battery_voltage_v:"UPS battery voltage",battery_current_ma:"UPS battery current",battery_power_w:"UPS battery power",battery_capacity_est_pct:"UPS capacity estimate"};
-const units = {pt100_1_c:"°C",pt100_2_c:"°C",pt100_3_c:"°C",co2_ppm:"ppm",air_temperature_c:"°C",humidity_rh_pct:"%",soil_voltage_v:"V",laser_distance_mm:"mm",light_raw:"",uv_raw:"",battery_voltage_v:"V",battery_current_ma:"mA",battery_power_w:"W",battery_capacity_est_pct:"%"};
+const labels = {pt100_1_c:"PT100-1",pt100_2_c:"PT100-2",pt100_3_c:"PT100-3",co2_ppm:"CO₂",air_temperature_c:"Air temperature",humidity_rh_pct:"Humidity",soil_voltage_v:"Soil voltage",laser_distance_mm:"Laser distance",light_raw:"Light (raw)",uv_raw:"UV (raw)",battery_voltage_v:"UPS battery voltage",battery_current_ma:"UPS battery current",battery_power_w:"UPS battery power",battery_capacity_est_pct:"UPS capacity estimate",bme280_temperature_c:"BME280 temperature",bme280_humidity_pct:"BME280 humidity",bme280_pressure_hpa:"BME280 pressure",ens160_aqi:"ENS160 AQI",ens160_tvoc_ppb:"ENS160 TVOC",ens160_eco2_ppm:"ENS160 eCO₂",laser_current_ma:"Laser current"};
+const units = {pt100_1_c:"°C",pt100_2_c:"°C",pt100_3_c:"°C",co2_ppm:"ppm",air_temperature_c:"°C",humidity_rh_pct:"%",soil_voltage_v:"V",laser_distance_mm:"mm",light_raw:"",uv_raw:"",battery_voltage_v:"V",battery_current_ma:"mA",battery_power_w:"W",battery_capacity_est_pct:"%",bme280_temperature_c:"°C",bme280_humidity_pct:"%",bme280_pressure_hpa:"hPa",ens160_aqi:"",ens160_tvoc_ppb:"ppb",ens160_eco2_ppm:"ppm",laser_current_ma:"mA"};
 function fmt(v,n=1){return typeof v==="number" && Number.isFinite(v) ? v.toFixed(n) : "—"}
 function date(v){return v ? new Date(v).toLocaleString() : "—"}
 function message(s,error=false){$("message").textContent=s;$("message").className=error?"error":""}
