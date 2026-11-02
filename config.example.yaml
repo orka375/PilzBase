@@ -2,7 +2,6 @@ station_id: UNIT-01
 interval_seconds: 15
 duration_days: 56
 database_path: ./data/measurements.sqlite3
-sensor_mode: simulated  # Hardware drivers not yet configured
-api_host: 127.0.0.1  # Use 0.0.0.0 only on a trusted isolated network
+sensor_mode: simulated
+api_host: 0.0.0.0 
 api_port: 8000
-# No API token is required. Keep the station on a trusted isolated network.
