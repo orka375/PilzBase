@@ -172,6 +172,10 @@ def create_app(config):
     async def readings(sid: str, after_id: int = Query(0, ge=0), limit: int = Query(240, ge=1, le=5000)):
         return await call(sid, f"/api/v1/measurements?after_id={after_id}&limit={limit}")
 
+    @app.get("/api/stations/{sid}/sensors")
+    async def sensor_overview(sid: str):
+        return await call(sid, "/api/v1/sensors")
+
     @app.post("/api/stations/{sid}/start")
     async def start(sid: str):
         return await call(sid, "/api/v1/experiments/start", "POST")
