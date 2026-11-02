@@ -34,6 +34,19 @@ pytest -q
 
 For a trusted isolated LAN, set `api_host: 0.0.0.0` . **HTTP is not encrypted**; use TLS or VPN for communication beyond a trusted network. Do not expose the station directly to the public internet.
 
+## One-command Raspberry Pi setup (recommended)
+
+Run as your **normal user**, not with `sudo`. The installer calls sudo for required APT packages and enables systemd user-service boot startup:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/orka375/PilzBase/main/deploy/install-rpi.sh -o /tmp/pilzbase-install.sh
+bash /tmp/pilzbase-install.sh
+```
+
+The script installs system Python dependencies via APT, clones or updates `~/PilzBase`, creates `config.yaml` and `hardware.yaml` without overwriting an existing database, creates `data/`, installs the systemd **user** service, enables lingering and starts PilzBase. The button and LED remain disabled in a fresh hardware config until the wiring is verified. For existing installations, review your database path and saved station settings after running it.
+
+Check the service with `systemctl --user status pilzbase`, see logs with `journalctl --user -u pilzbase -f`, and open `http://<pi-ip>:8000/` on a trusted LAN.
+
 ## Raspberry Pi installation: system Python, single home folder (no venv)
 
 On Raspberry Pi OS Lite, install dependencies using APT, not global pip (PEP 668):
