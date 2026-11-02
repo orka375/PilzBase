@@ -58,7 +58,7 @@ def test_expiry(tmp_path):
 
 
 def test_dashboard_served(tmp_path):
-    cfg = Config(database_path=str(tmp_path / "dashboard.sqlite3"), api_token="testtoken")
+    cfg = Config(database_path=str(tmp_path / "dashboard.sqlite3"))
     app = create_app(cfg)
     with TestClient(app) as client:
         response = client.get("/")
@@ -67,3 +67,25 @@ def test_dashboard_served(tmp_path):
         assert "PilzBase" in response.text
         assert "/api/v1/status" in response.text
         assert "Start experiment" in response.text
+
+
+def test_button_state_machine(tmp_path):
+    from pilzbase.hardware import ButtonLogic
+    db = Storage(str(tmp_path / "button.sqlite3"))
+    class Dummy:
+        def read(self): return {}
+    engine = Engine(db, Dummy(), "UNIT-01", 15, 56)
+    b = ButtonLogic(engine)
+    b.update(False, 1.0)  # boot release
+    b.update(True, 2.0); b.update(False, 2.1)
+    assert engine.status()["state"] == "READY"
+    assert b.output(2.2) in (True, False)
+    b.update(True, 3.0); b.update(False, 3.1)
+    assert engine.status()["state"] == "MEASURING"
+    b.update(True, 4.0); b.update(True, 7.1)
+    assert engine.status()["state"] == "MEASURING"  # needs status activation
+    b.update(False, 7.2)
+    b.update(True, 8.0); b.update(False, 8.1)
+    b.update(True, 9.0); b.update(True, 12.1)
+    assert engine.status()["state"] == "STOPPED"
+    db.close()
