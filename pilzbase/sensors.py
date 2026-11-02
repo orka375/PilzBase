@@ -11,6 +11,8 @@ FIELDS = (
     "pt100_1_c", "pt100_2_c", "pt100_3_c", "co2_ppm",
     "air_temperature_c", "humidity_rh_pct", "soil_voltage_v",
     "laser_distance_mm", "light_raw", "uv_raw",
+    "battery_voltage_v", "battery_current_ma", "battery_power_w",
+    "battery_capacity_est_pct",
 )
 
 class SensorSource(Protocol):
