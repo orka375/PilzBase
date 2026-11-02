@@ -62,6 +62,8 @@ def inventory(config, mode, latest=None, probe=False):
             available = {}
         if mode == "simulated" and key != "ups_hat_c":
             available = {}
+        if mode == "hardware" and not enabled:
+            available = {}
         # Do not claim detection based on simulated values or unverified address ACK.
         if mode == "simulated" and key != "ups_hat_c":
             status = "disabled" if not enabled else "not_checked"
