@@ -21,8 +21,8 @@ canvas{width:100%;height:270px;display:block}
 <div class="actions"><button id="refresh">↻ Refresh</button><button id="startAll" class="primary">▶ Start all</button><button id="stopAll" class="danger">■ Stop all</button></div></div>
 <p id="summary" class="muted">Connecting…</p><div id="message" aria-live="polite"></div>
 <section class="section panel"><div class="row"><div><h2>Add or update station</h2><p class="muted">Enter a hostname or IP, then verify the station and save its connection.</p></div><form id="addStation" class="actions"><select id="newId" aria-label="Station"><option>UNIT-01</option><option>UNIT-02</option><option>UNIT-03</option><option>UNIT-04</option><option>UNIT-05</option></select><input id="newAddress" placeholder="pilzbase-01.local or 192.168.1.101" required aria-label="IP address or hostname"><button class="primary" type="submit">Connect &amp; save</button></form></div></section><section id="cards" class="grid"></section>
-<section class="section panel"><div class="row"><div><h2>Compare stations</h2><p class="muted">Recent measurements, one signal across all stations</p></div><select id="metric"><option value="pt100_1_c">PT100-1 temperature (°C)</option><option value="co2_ppm">CO₂ (ppm)</option><option value="humidity_rh_pct">Humidity (%)</option><option value="laser_distance_mm">Laser distance (mm)</option><option value="soil_voltage_v">Soil voltage (V)</option></select></div><canvas id="trend"></canvas></section>
-<p class="muted section">Dashboard updates every 15 seconds · Offline stations cannot be controlled · Data shown are simulated until real sensor drivers are installed.</p>
+<section class="section panel"><div class="row"><div><h2>Compare stations</h2><p class="muted">Recent measurements, one signal across all stations</p></div><select id="metric"><option value="pt100_1_c">PT100-1 temperature (°C)</option><option value="co2_ppm">CO₂ (ppm)</option><option value="humidity_rh_pct">Humidity (%)</option><option value="laser_distance_mm">Laser distance (mm)</option><option value="soil_voltage_v">Soil voltage (V)</option><option value="battery_voltage_v">UPS battery voltage (V)</option><option value="battery_current_ma">UPS battery current (mA)</option><option value="battery_power_w">UPS battery power (W)</option><option value="battery_capacity_est_pct">UPS battery estimate (%)</option></select></div><canvas id="trend"></canvas></section>
+<p class="muted section">Dashboard updates every 15 seconds · Offline stations cannot be controlled · Environmental measurements are simulated; UPS battery values use actual I²C readings when enabled.</p>
 </main><script>
 "use strict";
 const $=id=>document.getElementById(id);let stations=[],busy=false;
@@ -44,7 +44,7 @@ const root=$("cards");root.replaceChildren();
 for(const s of stations){
 const card=el("article","card"+(s.online?"":" off"));const head=el("div","row");head.append(el("span","label",s.id),el("span","badge"+(s.online?"":" off"),s.online?s.status.state:"OFFLINE"));card.append(head);
 const latest=s.latest?.values||{};const metrics=el("div","metrics");
-for(const [label,value] of [["PT100-1",fmt(latest.pt100_1_c)+" °C"],["CO₂",fmt(latest.co2_ppm,0)+" ppm"],["Humidity",fmt(latest.humidity_rh_pct)+" %"],["Laser",fmt(latest.laser_distance_mm)+" mm"]]){
+for(const [label,value] of [["PT100-1",fmt(latest.pt100_1_c)+" °C"],["CO₂",fmt(latest.co2_ppm,0)+" ppm"],["Humidity",fmt(latest.humidity_rh_pct)+" %"],["Laser",fmt(latest.laser_distance_mm)+" mm"],["UPS battery",fmt(latest.battery_voltage_v,2)+" V"],["UPS charge est.",fmt(latest.battery_capacity_est_pct,0)+" %"]]){
  const m=el("div");m.append(el("div","muted",label),el("div","num",s.online?value:"—"));metrics.append(m)}
 card.append(metrics);card.append(el("p","muted",s.online?"Samples: "+s.status.measurements+" · Last: "+date(s.latest?.acquired_at):s.error||"Station unreachable"));
 const controls=el("div","actions");const running=s.online&&s.status.state==="MEASURING";
