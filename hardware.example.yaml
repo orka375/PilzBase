@@ -10,7 +10,7 @@ sensors:
   pt100_1: {enabled: false, interface: spi, bus: 0, device: 0, cs_gpio: 8, rtd_nominal_ohms: 100, reference_ohms: 430, wires: 3}
   pt100_2: {enabled: false, interface: spi, bus: 0, device: 1, cs_gpio: 7, rtd_nominal_ohms: 100, reference_ohms: 430, wires: 3}
   dfr0553: {enabled: false, interface: i2c, bus: 1, address: 0x48}
-  opto_1220: {enabled: false, adc_channel: 1, shunt_ohms: 150, min_ma: 4, max_ma: 20, min_mm: 0, max_mm: 200}
+  opto_1220: {enabled: false, adc_channel: 1, shunt_ohms: 150, min_ma: 4, max_ma: 20, min_mm: null, max_mm: null  # Set actual 4mA/20mA distances from laser configuration}
   grove_soil: {enabled: false, adc_channel: 0}
   bme280: {enabled: false, interface: i2c, bus: 1, address: 0x76}
   ens160: {enabled: false, interface: i2c, bus: 1, address: 0x53}
