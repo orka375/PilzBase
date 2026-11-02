@@ -1,28 +1,19 @@
-# BCM numbering. Confirmed user GPIOs: button 16, LED 19, relay 2 pin 20.
-button:
-  enabled: true
-  gpio: 16
-  pull_up: true
-  debounce_ms: 50
-  long_press_seconds: 3
-led:
-  enabled: true
-  gpio: 19
-  active_high: true
-  status_timeout_seconds: 10
+# BCM numbering. Verify all proposed SPI/ADC assignments against the PCB.
+button: {enabled: true, gpio: 16, pull_up: true, debounce_ms: 50, long_press_seconds: 3}
+led: {enabled: true, gpio: 19, active_high: true, status_timeout_seconds: 10}
 relays:
-  relay_2: {gpio: 20, enabled: false}  # Reserved, no function yet.
-# Sensor routing below is provisional; physical sensor drivers are not active.
+  relay_2:
+    enabled: false  # Enable only after polarity and safe boot behavior verified
+    gpio: 20
+    laser_off_level: true   # HIGH = laser OFF; LOW = laser ON
 sensors:
-  pt100_1: {model: MAX31865, interface: spi, bus: 0, cs_gpio: 8}
-  pt100_2: {model: MAX31865, interface: spi, bus: 0, cs_gpio: 7}
-  dfr0553: {model: ADS1115, interface: i2c, bus: 1, address: 0x48}
-  opto_1220: {model: ILD1220, interface: dfr0553, channel: 1, shunt_ohms: 150}
-  soil_moisture: {interface: dfr0553, channel: 0}
-  scd41: {interface: i2c, bus: 1, address: 0x62}
-  light: {interface: i2c, bus: 1, address: null}
-  uv: {interface: i2c, bus: 1, address: null}
-ups_hat_c:
-  enabled: false  # Set true after testing I2C: i2cdetect -y 1
-  bus: 1
-  address: 0x43
+  pt100_1: {enabled: false, interface: spi, bus: 0, device: 0, cs_gpio: 8, rtd_nominal_ohms: 100, reference_ohms: 430, wires: 3}
+  pt100_2: {enabled: false, interface: spi, bus: 0, device: 1, cs_gpio: 7, rtd_nominal_ohms: 100, reference_ohms: 430, wires: 3}
+  dfr0553: {enabled: false, interface: i2c, bus: 1, address: 0x48}
+  opto_1220: {enabled: false, adc_channel: 1, shunt_ohms: 150, min_ma: 4, max_ma: 20, min_mm: 0, max_mm: 200}
+  grove_soil: {enabled: false, adc_channel: 0}
+  bme280: {enabled: false, interface: i2c, bus: 1, address: 0x76}
+  ens160: {enabled: false, interface: i2c, bus: 1, address: 0x53}
+  scd41: {enabled: false, interface: i2c, bus: 1, address: 0x62}
+ups_hat_c: {enabled: false, bus: 1, address: 0x43}
+# All sensor enable flags default OFF until real wiring and calibration verified.
