@@ -33,8 +33,8 @@ def load_config(path: str | None = None) -> Config:
         raise ValueError("interval_seconds must be between 0.1 and 3600")
     if not (0 < cfg.duration_days <= 365):
         raise ValueError("duration_days must be between 0 and 365")
-    if cfg.sensor_mode != "simulated":
-        raise ValueError("Only simulated mode is implemented; real sensor drivers require verified wiring")
+    if cfg.sensor_mode not in ("simulated", "hardware"):
+        raise ValueError("sensor_mode must be simulated or hardware")
     if not (1 <= cfg.api_port <= 65535):
         raise ValueError("Invalid port")
     if cfg.api_host not in {"127.0.0.1", "localhost", "0.0.0.0", "::1"}:
