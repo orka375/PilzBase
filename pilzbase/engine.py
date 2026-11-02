@@ -31,7 +31,7 @@ class Engine:
                     "experiment": exp,
                     "measurements": self.storage.count(),
                     "last_measurement_at": self.last_success_at,
-                    "sensor_mode": "hardware" if hasattr(self.source, "physical") and self.source.physical else "simulated"}
+                    "sensor_mode": "simulated" if getattr(self.source, "is_simulated", True) else "hardware"}
 
     def start(self) -> dict:
         with self.lock:
@@ -86,7 +86,8 @@ class Engine:
                     errors[field] = "invalid reading"
                 else:
                     cleaned[field] = float(value)
-            self.storage.save(exp["id"], cycle, scheduled, cleaned, errors)
+            self.storage.save(exp["id"], cycle, scheduled, cleaned, errors,
+                              simulated=getattr(self.source, "is_simulated", True))
             if errors:
                 self.storage.log("WARNING", "SENSOR_ERROR", str(errors)[:900])
             self.last_success_at = utc_now()
