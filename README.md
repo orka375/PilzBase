@@ -132,3 +132,20 @@ Behavior:
 - The latest design intentionally does not permit a physical button to start a new experiment after STOPPED/FINISHED; use the dashboard to create a new experiment.
 
 The station service must have GPIO access. On Raspberry Pi OS this usually means ensuring your login user has GPIO access (check `groups`; if required, `sudo usermod -aG gpio "$USER"` followed by logout/login). Install `gpiozero` through APT and ensure a working Pi GPIO pin factory is available. Keep the GPIO enabled settings off for host-based tests.
+
+## Confirmed GPIO routing and UPS HAT (C)
+
+User-confirmed BCM GPIO assignments: **button GPIO16**, **single-colour status LED GPIO19**, **relay 2 GPIO20** (reserved/inactive, no actuation logic). The updated `hardware.example.yaml` contains these assignments. Existing `~/PilzBase/hardware.yaml` is **not overwritten**, so update it manually.
+
+Hardware inventory: **two MAX31865** PT100 interfaces (provisional SPI0 chip selects GPIO8 and GPIO7); **DFRobot DFR0553** (ADS1115, I²C address 0x48 as example); **optoNCDT 1220** laser 4–20 mA via a shunt and ADS1115 analog input; and the **Waveshare UPS HAT (C)** with INA219 on I²C. The assigned ADC channel and shunt value are **provisional** and must match the finished wiring. Hardware drivers for MAX31865, DFR0553, and laser are **not yet implemented**; their data remain simulated.
+
+UPS battery telemetry is implemented as an **opt-in** real INA219 I²C read. In `~/PilzBase/hardware.yaml` set:
+
+```yaml
+ups_hat_c:
+  enabled: true
+  bus: 1
+  address: 0x43
+```
+
+Install I²C tools and driver: `sudo apt install -y python3-smbus i2c-tools`; enable I²C using `sudo raspi-config` and inspect `i2cdetect -y 1` to verify the INA219 address before enabling. Restart with `systemctl --user restart pilzbase`. The station dashboard and measurement JSON/CSV expose battery voltage, signed current, power and **voltage-based estimated percentage** during experiments. When the HAT is disabled or I²C fails the battery fields remain null. This measurement is not a calibrated fuel-gauge reading; percent is particularly unreliable while charging. All other sensor channels currently remain simulated.
