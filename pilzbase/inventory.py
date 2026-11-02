@@ -58,6 +58,8 @@ def inventory(config, mode, latest=None, probe=False):
         elif key in ("opto_1220", "grove_soil"):
             connection = f"DFR0553 A{cfg.get('adc_channel', '?')} (verify wiring)"
         available = {field: values.get(field) for field in fields if values.get(field) is not None}
+        if latest and latest.get("simulated") and key != "ups_hat_c":
+            available = {}
         if mode == "simulated" and key != "ups_hat_c":
             available = {}
         # Do not claim detection based on simulated values or unverified address ACK.
