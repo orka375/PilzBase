@@ -11,7 +11,16 @@ button.primary{background:#75dba9;color:#11281b;border-color:#75dba9}.danger{col
 .card,.panel{background:#14251e;border:1px solid #315044;border-radius:15px;padding:19px;min-width:0}.card.off{opacity:.64}
 .label{font-weight:800;font-size:17px}.badge{display:inline-block;color:#8de6b3;background:#214a35;border-radius:30px;padding:5px 10px;font-size:12px}.badge.off{color:#ffc1b5;background:#512e2b}
 .metrics{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:17px 0}.num{font-size:23px;font-weight:750;margin-top:3px}
-.card .actions{margin-top:13px}.section{margin-top:20px}
+.card .actions{margin-top:13px}
+.sensor-panel{margin-top:20px}.sensor-scroll{overflow:auto;max-height:610px;margin-top:12px}
+.sensor-table{width:100%;border-collapse:collapse;font-size:13px}.sensor-table th{text-align:left;color:#a6bdb2;font-size:12px;position:sticky;top:0;background:#14251e}
+.sensor-table th,.sensor-table td{padding:11px 12px;border-bottom:1px solid #315044;vertical-align:top}
+.sensor-table td:nth-child(2){font-weight:650}.sensor-table .detail{display:block;color:#a6bdb2;font-size:11px;margin-top:4px;max-width:360px}
+.sensor-status{font-size:12px;border-radius:20px;padding:4px 8px;display:inline-block;background:#2c3a32;color:#d5e6dd;white-space:nowrap}
+.sensor-status.reading{background:#204c35;color:#9df0be}.sensor-status.error{background:#532c2b;color:#ffb4a9}
+.sensor-status.disabled{background:#323b3b;color:#c1c8c7}.sensor-status.not_checked{background:#4a4029;color:#f6d79d}
+.sensor-top{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.sensor-top select{min-width:130px}
+.section{margin-top:20px}
 canvas{width:100%;height:270px;display:block}
 #message{min-height:19px;color:#ffbcae;font-size:13px;margin-top:8px}
 @media(max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:610px){.grid{grid-template-columns:1fr}main{padding:20px 14px}}
@@ -21,11 +30,12 @@ canvas{width:100%;height:270px;display:block}
 <div class="actions"><button id="refresh">↻ Refresh</button><button id="startAll" class="primary">▶ Start all</button><button id="stopAll" class="danger">■ Stop all</button></div></div>
 <p id="summary" class="muted">Connecting…</p><div id="message" aria-live="polite"></div>
 <section class="section panel"><div class="row"><div><h2>Add or update station</h2><p class="muted">Enter a hostname or IP, then verify the station and save its connection.</p></div><form id="addStation" class="actions"><select id="newId" aria-label="Station"><option>UNIT-01</option><option>UNIT-02</option><option>UNIT-03</option><option>UNIT-04</option><option>UNIT-05</option></select><input id="newAddress" placeholder="pilzbase-01.local or 192.168.1.101" required aria-label="IP address or hostname"><button class="primary" type="submit">Connect &amp; save</button></form></div></section><section id="cards" class="grid"></section>
+<section class="section panel sensor-panel"><div class="row"><div><h2>Sensor overview</h2><p class="muted">Exact device models, configured wiring, physical reading status and last recorded values. Simulated values never prove a connection.</p></div><div class="sensor-top"><label for="sensorStation" class="muted">Station</label><select id="sensorStation"><option value="all">All stations</option></select><button id="sensorRefresh">↻ Refresh sensors</button></div></div><p id="sensorSummary" class="muted">Loading sensor inventory…</p><div class="sensor-scroll"><table class="sensor-table"><thead><tr><th>Station</th><th>Type / exact sensor</th><th>Connection</th><th>Status</th><th>Last values</th></tr></thead><tbody id="sensorRows"></tbody></table></div></section>
 <section class="section panel"><div class="row"><div><h2>Compare stations</h2><p class="muted">Recent measurements, one signal across all stations</p></div><select id="metric"><option value="pt100_1_c">PT100-1 temperature (°C)</option><option value="co2_ppm">CO₂ (ppm)</option><option value="humidity_rh_pct">Humidity (%)</option><option value="laser_distance_mm">Laser distance (mm)</option><option value="soil_voltage_v">Soil voltage (V)</option><option value="bme280_temperature_c">BME280 temperature (°C)</option><option value="bme280_humidity_pct">BME280 humidity (%)</option><option value="bme280_pressure_hpa">BME280 pressure (hPa)</option><option value="ens160_tvoc_ppb">ENS160 TVOC (ppb)</option><option value="ens160_eco2_ppm">ENS160 eCO₂ (ppm)</option><option value="battery_voltage_v">UPS battery voltage (V)</option><option value="battery_current_ma">UPS battery current (mA)</option><option value="battery_power_w">UPS battery power (W)</option><option value="battery_capacity_est_pct">UPS battery estimate (%)</option></select></div><canvas id="trend"></canvas></section>
-<p class="muted section">Dashboard updates every 15 seconds · Offline stations cannot be controlled · Environmental measurements are simulated; UPS battery values use actual I²C readings when enabled.</p>
+<p class="muted section">Dashboard updates every 15 seconds · Offline stations cannot be controlled · Sensor mode is configured per Raspberry Pi: simulated = test data, hardware = enabled physical sensors.</p>
 </main><script>
 "use strict";
-const $=id=>document.getElementById(id);let stations=[],busy=false;
+const $=id=>document.getElementById(id);let stations=[],busy=false,sensorInventories={};
 const fmt=(v,n=1)=>typeof v==="number"?v.toFixed(n):"—";
 const date=v=>v?new Date(v).toLocaleString():"—";
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
@@ -87,13 +97,55 @@ ctx.font="12px system-ui";for(let i=0;i<4;i++){const yy=top+i*height/3;ctx.strok
 stations.forEach((s,index)=>{const rows=series[s.id]||[];ctx.strokeStyle=colors[index];ctx.lineWidth=2;ctx.beginPath();let opened=false;
  rows.forEach(r=>{const t=Date.parse(r.acquired_at),v=r.values?.[metric];if(!Number.isFinite(t)||typeof v!=="number"){opened=false;return}if(!opened){ctx.moveTo(x(t),y(v));opened=true}else ctx.lineTo(x(t),y(v))});ctx.stroke();
  ctx.fillStyle=colors[index];ctx.fillText(s.id,left+index*80,rect.height-7)})}
+const sensorUnits={pt100_1_c:"°C",pt100_2_c:"°C",laser_distance_mm:"mm",laser_current_ma:"mA",soil_voltage_v:"V",bme280_temperature_c:"°C",bme280_humidity_pct:"%",bme280_pressure_hpa:"hPa",ens160_aqi:"",ens160_tvoc_ppb:"ppb",ens160_eco2_ppm:"ppm",co2_ppm:"ppm",air_temperature_c:"°C",humidity_rh_pct:"%",battery_voltage_v:"V",battery_current_ma:"mA",battery_power_w:"W",battery_capacity_est_pct:"%"};
+function updateSensorStationOptions(){
+ const selector=$("sensorStation"),selected=selector.value;
+ selector.replaceChildren();
+ const all=el("option","", "All stations");all.value="all";selector.append(all);
+ for(const s of stations){const option=el("option","",s.id);option.value=s.id;selector.append(option)}
+ selector.value=[...selector.options].some(o=>o.value===selected)?selected:"all";
+}
+function drawSensorInventory(){
+ const body=$("sensorRows");body.replaceChildren();
+ const selected=$("sensorStation").value;
+ let shown=0,reading=0,failed=0;
+ for(const station of stations){
+  if(selected!=="all"&&selected!==station.id)continue;
+  const inv=sensorInventories[station.id];
+  if(!station.online||!inv||inv.error){
+   const tr=el("tr");const cell=el("td","",station.online?(inv?.error||"Sensor endpoint unavailable"):"Station offline");
+   cell.colSpan=5;tr.append(el("td","",station.id),cell);cell.colSpan=4;body.append(tr);continue;
+  }
+  for(const sensor of inv.sensors||[]){
+   shown++;if(sensor.status==="reading")reading++;if(sensor.status==="error")failed++;
+   const tr=el("tr");
+   tr.append(el("td","",station.id));
+   const name=el("td");name.append(el("div","",sensor.type),el("div","detail",sensor.model));tr.append(name);
+   tr.append(el("td","",sensor.connection));
+   const state=el("td");state.append(el("span","sensor-status "+sensor.status,sensor.status.replaceAll("_"," ")),el("span","detail",sensor.detail||""));tr.append(state);
+   const entries=Object.entries(sensor.values||{});
+   const values=entries.length?entries.map(([k,v])=>k.replaceAll("_"," ")+": "+fmt(v,2)+" "+(sensorUnits[k]||"")).join(" · "):"—";
+   tr.append(el("td","",values));body.append(tr);
+  }
+ }
+ if(!body.children.length){const tr=el("tr"),cell=el("td","", "No stations configured");cell.colSpan=5;tr.append(cell);body.append(tr)}
+ $("sensorSummary").textContent=shown+" sensor entries · "+reading+" with readings · "+failed+" errors · Status is based on physical readings, not I²C address scans";
+}
+async function refreshSensorInventories(){
+ const results=await Promise.all(stations.filter(s=>s.online).map(async s=>{
+  try{return [s.id,await request("/api/stations/"+s.id+"/sensors")]}
+  catch(e){return [s.id,{error:e.message}]}
+ }));
+ sensorInventories=Object.fromEntries(results);
+ drawSensorInventory();
+}
 async function refresh(){
 try{
  const payload=await request("/api/stations");stations=payload.stations;$("summary").textContent=stations.filter(s=>s.online).length+" / "+stations.length+" configured stations online · "+stations.filter(s=>s.online&&s.status.state==="MEASURING").length+" measuring";
- drawCards();
+ drawCards();updateSensorStationOptions();await refreshSensorInventories();
  const results=await Promise.all(stations.filter(s=>s.online).map(async s=>{try{const offset=Math.max(0,(s.status.measurements||0)-240);return [s.id,(await request("/api/stations/"+s.id+"/measurements?after_id="+offset+"&limit=240")).rows]}catch{return[s.id,[]]}}));
  series=Object.fromEntries(results);drawTrend();
 }catch(e){$("message").textContent="Unable to refresh: "+e.message}}
-$("startAll").onclick=()=>control(null,"start");$("stopAll").onclick=()=>control(null,"stop");$("refresh").onclick=refresh;$("metric").onchange=drawTrend;
+$("startAll").onclick=()=>control(null,"start");$("stopAll").onclick=()=>control(null,"stop");$("refresh").onclick=refresh;$("metric").onchange=drawTrend;$("sensorStation").onchange=drawSensorInventory;$("sensorRefresh").onclick=refreshSensorInventories;
 window.addEventListener("resize",drawTrend);refresh();setInterval(refresh,15000);
 </script></body></html>
