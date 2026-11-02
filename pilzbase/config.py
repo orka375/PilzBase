@@ -14,6 +14,7 @@ class Config:
     sensor_mode: str = "simulated"
     api_host: str = "127.0.0.1"
     api_port: int = 8000
+    hardware_config_path: str = ""
 
 
 def load_config(path: str | None = None) -> Config:
