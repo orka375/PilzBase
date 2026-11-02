@@ -72,3 +72,27 @@ Open `http://127.0.0.1:8000/` from the Pi (or `http://<pi-address>:8000/` when r
 ## Central five-station laptop dashboard
 
 Run the optional laptop-side control center to monitor **UNIT-01 through UNIT-05** from one browser. Each Raspberry Pi keeps recording autonomously. See [laptop setup instructions](laptop/README.md). The control center defaults to `http://127.0.0.1:8080/` on the laptop and proxies each Pi's REST API. Its group start/stop commands are best-effort, **not synchronized or atomic**.
+
+## Physical button, single-colour status LED, and hardware pin configuration
+
+Copy `hardware.example.yaml` to `/etc/pilzbase/hardware.yaml` and configure the actual **BCM GPIO numbers** from your verified Fusion 360 schematic. Then set `hardware_config_path: /etc/pilzbase/hardware.yaml` in `/etc/pilzbase/config.yaml` and restart the service.
+
+```bash
+sudo cp /opt/pilzbase/hardware.example.yaml /etc/pilzbase/hardware.yaml
+sudo nano /etc/pilzbase/hardware.yaml
+sudo nano /etc/pilzbase/config.yaml
+sudo systemctl restart pilzbase
+sudo journalctl -u pilzbase -n 50 --no-pager
+```
+
+Set both `button.enabled` and `led.enabled` to `true` **only when correctly wired**. The proposed GPIO17 button and GPIO27 LED are *not verified against the current PCB*. Wire the normally-open button between GPIO and GND with a pull-up, and connect the single-colour LED with a suitable current-limiting resistor (for example, 1 kΩ) from GPIO to GND for active-high output.
+
+Behavior:
+- LED normally off; first short button press shows READY (slow blink), MEASURING (steady), STOPPED (double blink). LED times out after ten seconds.
+- Second short press within the ten-second display window starts only when READY.
+- In MEASURING, first short press shows status; holding for three seconds while status is visible stops the experiment.
+- LED remains off for FINISHED, BOOT, SHUTDOWN. Long holds are ignored if status was not activated. Button held at boot is ignored until released.
+- Sensors are still simulated. The `sensors` block documents **planned** SPI/I²C/ADC addresses; it does not yet activate sensor drivers.
+- The latest design intentionally does not permit a physical button to start a new experiment after STOPPED/FINISHED; use the dashboard to create a new experiment.
+
+The station service must have GPIO access. On Raspberry Pi OS this usually means adding the `pilzbase` user to the `gpio` group (`sudo usermod -aG gpio pilzbase`), then restarting the service. Install `gpiozero` (provided by the project dependencies) and ensure a working Pi GPIO pin factory is available. Keep the GPIO enabled settings off for host-based tests.
