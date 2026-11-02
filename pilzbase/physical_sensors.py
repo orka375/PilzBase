@@ -120,6 +120,33 @@ def scd41_read(cfg):
                 "air_temperature_c": -45+175*word(3)/65535,
                 "humidity_rh_pct": 100*word(6)/65535}
 
+def tcs34725_read(cfg):
+    """CJMCU-34725/TCS34725: raw clear, red, green and blue counts.
+
+    The color sensor does not measure UV. Readings depend on integration time,
+    gain and illumination; these are not calibrated lux or UV values.
+    """
+    from smbus import SMBus
+    bus_id = int(cfg.get("bus", 1))
+    addr = int(cfg.get("address", 0x29))
+    with closing(SMBus(bus_id)) as bus:
+        chip_id = bus.read_byte_data(addr, 0x80 | 0x12)
+        if chip_id not in (0x44, 0x4d):
+            raise IOError(f"Unexpected TCS34725 chip ID 0x{chip_id:02x}")
+        # Integration ~50.4 ms (ATIME 0xEB), gain 4x.
+        bus.write_byte_data(addr, 0x80 | 0x01, 0xeb)
+        bus.write_byte_data(addr, 0x80 | 0x0f, 0x01)
+        bus.write_byte_data(addr, 0x80 | 0x00, 0x01)  # oscillator on
+        time.sleep(0.003)
+        bus.write_byte_data(addr, 0x80 | 0x00, 0x03)  # RGBC ADC on
+        time.sleep(0.065)
+        status = bus.read_byte_data(addr, 0x80 | 0x13)
+        if not status & 0x01:
+            raise IOError("TCS34725 RGBC sample not ready")
+        data = bus.read_i2c_block_data(addr, 0x80 | 0x20 | 0x14, 8)
+    words = [(data[i] | (data[i+1] << 8)) for i in (0, 2, 4, 6)]
+    return dict(zip(("color_clear_raw", "color_red_raw", "color_green_raw", "color_blue_raw"), words))
+
 
 class PhysicalSensors:
     def __init__(self, config):
@@ -164,6 +191,9 @@ class PhysicalSensors:
             cfg = self.sensors.get(name, {})
             if cfg.get("enabled"):
                 attempt(name, lambda cfg=cfg, reader=reader: reader(cfg))
+        color = self.sensors.get("cjmcu_34725", {})
+        if color.get("enabled"):
+            attempt("cjmcu_34725", lambda: tcs34725_read(color))
         scd = self.sensors.get("scd41", {})
         if scd.get("enabled"):
             def poll_scd():
