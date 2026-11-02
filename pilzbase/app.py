@@ -29,6 +29,7 @@ def create_app(cfg: Config) -> FastAPI:
     physical = PhysicalSensors(hardware_config) if cfg.sensor_mode == "hardware" else None
 
     class StationSensors:
+        is_simulated = cfg.sensor_mode == "simulated"
         def read(self):
             values = physical.read() if physical else SimulatedSensors().read()
             if ups:
