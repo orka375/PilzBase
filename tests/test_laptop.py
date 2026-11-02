@@ -65,3 +65,29 @@ def test_connect_and_remove(tmp_path, monkeypatch):
         assert load_config(str(cfg_file))["stations"]["UNIT-01"] == "http://unit01.local:8000"
         assert client.delete("/api/stations/UNIT-01").status_code == 200
         assert client.get("/api/stations").json()["stations"] == []
+
+
+def test_fetch_station_uses_urllib_request_not_fastapi_request(monkeypatch):
+    """Regression: adding a station must construct a real outbound HTTP request."""
+    import laptop.server as server
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self, limit):
+            return b'{"station_id":"UNIT-01","state":"READY"}'
+
+    class FakeOpener:
+        def open(self, request, timeout):
+            assert request.full_url == "http://192.168.1.101:8000/api/v1/status"
+            assert request.get_method() == "GET"
+            assert request.get_header("Authorization") is None
+            return FakeResponse()
+
+    monkeypatch.setattr("urllib.request.build_opener", lambda *args: FakeOpener())
+    result = server.fetch_station("UNIT-01", "http://192.168.1.101:8000", "/api/v1/status")
+    assert result["station_id"] == "UNIT-01"
