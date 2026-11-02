@@ -13,15 +13,29 @@ from .engine import Engine
 from .sensors import SimulatedSensors, FIELDS
 from .storage import Storage
 from .hardware import HardwareController, load_hardware
+from .ups import UPSHatC
 
 log = logging.getLogger(__name__)
 
 
 def create_app(cfg: Config) -> FastAPI:
     store = Storage(cfg.database_path)
-    engine = Engine(store, SimulatedSensors(), cfg.station_id, cfg.interval_seconds, cfg.duration_days)
 
     hardware_config = load_hardware(cfg.hardware_config_path) if cfg.hardware_config_path else {}
+    ups_cfg = hardware_config.get("ups_hat_c", {})
+    ups = UPSHatC(ups_cfg.get("bus", 1), ups_cfg.get("address", 0x43)) if ups_cfg.get("enabled", False) else None
+
+    class StationSensors:
+        def read(self):
+            values = SimulatedSensors().read()
+            if ups:
+                try:
+                    values.update(ups.read())
+                except Exception:
+                    log.exception("UPS HAT C read failed")
+            return values
+
+    engine = Engine(store, StationSensors(), cfg.station_id, cfg.interval_seconds, cfg.duration_days)
     hardware = HardwareController(engine, hardware_config)
 
     @asynccontextmanager
