@@ -56,7 +56,7 @@ const card=el("article","card"+(s.online?"":" off"));const head=el("div","row");
 const latest=s.latest?.values||{};const metrics=el("div","metrics");
 for(const [label,value] of [["PT100-1",fmt(latest.pt100_1_c)+" °C"],["CO₂",fmt(latest.co2_ppm,0)+" ppm"],["Humidity",fmt(latest.humidity_rh_pct)+" %"],["Laser",fmt(latest.laser_distance_mm)+" mm"],["UPS battery",fmt(latest.battery_voltage_v,2)+" V"],["UPS charge est.",fmt(latest.battery_capacity_est_pct,0)+" %"]]){
  const m=el("div");m.append(el("div","muted",label),el("div","num",s.online?value:"—"));metrics.append(m)}
-card.append(metrics);card.append(el("p","muted",s.online?"Samples: "+s.status.measurements+" · Last: "+date(s.latest?.acquired_at):s.error||"Station unreachable"));
+card.append(metrics);card.append(el("p","muted",s.online?"Sensor mode: "+(s.status.sensor_mode||"unknown"):"Sensor mode: unavailable"));card.append(el("p","muted",s.online?"Samples: "+s.status.measurements+" · Last: "+date(s.latest?.acquired_at):s.error||"Station unreachable"));
 const controls=el("div","actions");const running=s.online&&s.status.state==="MEASURING";
 controls.append(button("Start","primary",()=>control(s.id,"start"),!s.online||running||busy));
 controls.append(button("Stop","danger",()=>control(s.id,"stop"),!running||busy));
