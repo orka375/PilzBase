@@ -25,6 +25,9 @@ def load_hardware(path):
             pin = device.get("gpio")
             if type(pin) is not int or pin not in range(2, 28):
                 raise ValueError("GPIO must be a valid BCM GPIO 2..27")
+    relay = data.get("relays", {}).get("relay_2", {})
+    if relay.get("enabled") and (relay.get("gpio") != 20 or relay.get("laser_off_level") is not True):
+        raise ValueError("Relay 2 requires verified GPIO20 and active HIGH laser-OFF polarity")
     if button.get("enabled") and led.get("enabled") and button["gpio"] == led["gpio"]:
         raise ValueError("Button and LED cannot share a GPIO")
     if not 0.01 <= float(button.get("debounce_ms", 50)) / 1000 <= 0.5:
