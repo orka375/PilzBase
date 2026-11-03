@@ -26,6 +26,7 @@ input,select{border:1px solid #315149;background:#14241f;color:#e9f1ed;border-ra
 .kv{padding:11px 0;border-bottom:1px solid #2a4039;display:flex;justify-content:space-between;gap:10px;font-size:13px}
 .kv strong{font-variant-numeric:tabular-nums}.note{font-size:12px;color:#a4c7b6}
 #message{min-height:22px;font-size:13px}#message.error{color:#ffb4a9}
+.sensor-overview-table{font-size:14px}.sensor-overview-table th{font-size:12px;text-transform:uppercase;letter-spacing:.06em}.sensor-overview-table td{padding:15px 10px;vertical-align:middle}.sensor-name{font-weight:750;font-size:15px}.sensor-sub{font-size:12px;color:#a4bcb0;margin-top:4px}.sensor-values{line-height:1.85;font-variant-numeric:tabular-nums}.sensor-pill{display:inline-block;padding:5px 10px;border-radius:30px;background:#394439;color:#e2e8e2;font-weight:700;font-size:12px}.sensor-pill.reading{background:#1d5134;color:#a6f4be}.sensor-pill.error{background:#5b2828;color:#ffd0c8}.sensor-pill.not_checked{background:#594724;color:#ffe0a3}.sensor-pill.disabled{background:#313a3b;color:#b7c9c2}.sensor-meta{font-size:12px;color:#a4c7b6;margin-top:5px}
 table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;color:#aac0b5;font-weight:600}td,th{padding:11px 6px;border-bottom:1px solid #2a4039}
 .scroll{overflow:auto;max-height:315px}footer{margin-top:21px;color:#93aea2;font-size:12px}
 @media(max-width:880px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.charts{grid-template-columns:1fr}}@media(max-width:520px){.grid{grid-template-columns:1fr 1fr}.panel{padding:15px}.value{font-size:23px}.metric{grid-template-columns:1fr}header{padding:16px 22px}}
@@ -48,7 +49,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;colo
 <div><div class="card-label">BATTERY POWER</div><div class="value"><span id="batteryPower">—</span> <span class="unit">W</span></div></div>
 <div><div class="card-label">CAPACITY ESTIMATE</div><div class="value"><span id="batteryPercent">—</span> <span class="unit">%</span></div></div>
 </div><p class="note">Negative current generally means discharging; positive means charging. Percent is approximate and inaccurate while charging. A dash indicates no battery measurement.</p></div>
-<section class="section panel"><div class="row"><div><h2>Sensor overview</h2><p class="note">Configured devices, physical reading status, and latest measurements. Values from simulated mode do not prove a sensor is connected.</p></div><span id="sensorMode" class="badge">—</span></div><div class="scroll" style="max-height:560px"><table><thead><tr><th>Type</th><th>Exact model</th><th>Connection</th><th>Status</th><th>Values</th></tr></thead><tbody id="sensorOverview"><tr><td colspan="5">Loading…</td></tr></tbody></table></div></section>
+<section class="section panel"><div class="row"><div><h2 style="font-size:21px;margin-bottom:6px">Live sensor overview</h2><p class="note">Green = physical measurements available; red = read error; yellow = not measured yet; grey = disabled. No data is inferred from I²C scans.</p></div><span id="sensorMode" class="badge">—</span></div><div class="scroll" style="max-height:none"><table class="sensor-overview-table"><thead><tr><th>Sensor name</th><th>Status</th><th>Value</th></tr></thead><tbody id="sensorOverview"><tr><td colspan="3">Loading…</td></tr></tbody></table></div><p class="note" id="sensorLatest">Last sample: —</p></section>
 <div class="section charts">
 <div class="panel"><div class="row"><h2>Temperature trend</h2><span class="note">PT100-1 · °C</span></div><canvas id="tempChart" class="chart" aria-label="Temperature trend"></canvas></div>
 <div class="panel"><div class="row"><h2>CO₂ trend</h2><span class="note">ppm</span></div><canvas id="co2Chart" class="chart" aria-label="CO2 trend"></canvas></div>
@@ -135,23 +136,29 @@ function displayTable(rows){
 async function sensorOverview(){
   const result=await (await api("/api/v1/sensors")).json();
   $("sensorMode").textContent="Mode: "+result.sensor_mode;
+  $("sensorLatest").textContent="Last saved sample: "+date(result.last_measurement_at)+" · Readings require a running experiment";
   const body=$("sensorOverview");body.replaceChildren();
   const unitMap={color_clear_raw:"counts",color_red_raw:"counts",color_green_raw:"counts",color_blue_raw:"counts",pt100_1_c:"°C",pt100_2_c:"°C",laser_distance_mm:"mm",laser_current_ma:"mA",soil_voltage_v:"V",bme280_temperature_c:"°C",bme280_humidity_pct:"%",bme280_pressure_hpa:"hPa",ens160_aqi:"",ens160_tvoc_ppb:"ppb",ens160_eco2_ppm:"ppm",co2_ppm:"ppm",air_temperature_c:"°C",humidity_rh_pct:"%",battery_voltage_v:"V",battery_current_ma:"mA",battery_power_w:"W",battery_capacity_est_pct:"%"};
+  const pretty={pt100_1_c:"Temperature",pt100_2_c:"Temperature",co2_ppm:"CO₂",air_temperature_c:"Air temperature",humidity_rh_pct:"Humidity",soil_voltage_v:"Voltage",laser_distance_mm:"Distance",laser_current_ma:"Current",color_clear_raw:"Clear",color_red_raw:"Red",color_green_raw:"Green",color_blue_raw:"Blue",bme280_temperature_c:"Temperature",bme280_humidity_pct:"Humidity",bme280_pressure_hpa:"Pressure",ens160_aqi:"AQI",ens160_tvoc_ppb:"TVOC",ens160_eco2_ppm:"eCO₂",battery_voltage_v:"Voltage",battery_current_ma:"Current",battery_power_w:"Power",battery_capacity_est_pct:"Charge estimate"};
   for(const s of result.sensors){
     const tr=document.createElement("tr");
-    const values=Object.entries(s.values||{}).map(([k,v])=>k.replaceAll("_"," ")+": "+fmt(v,2)+" "+(unitMap[k]||"")).join(" · ")||"—";
-    for(const value of [s.type,s.model,s.connection,s.status.replaceAll("_"," "),values]){
-      const td=document.createElement("td");td.textContent=value;tr.append(td);
-    }
-    tr.title=s.detail;body.append(tr);
-    const details=document.createElement("tr"),cell=document.createElement("td");cell.colSpan=5;cell.className="note";cell.textContent=s.detail;details.append(cell);body.append(details);
+    const name=document.createElement("td"),title=document.createElement("div"),sub=document.createElement("div");
+    title.className="sensor-name";title.textContent=s.model;sub.className="sensor-sub";sub.textContent=s.type+" · "+s.connection;name.append(title,sub);
+    const state=document.createElement("td"),pill=document.createElement("span"),details=document.createElement("div");
+    pill.className="sensor-pill "+s.status;pill.textContent=({reading:"● Reading",error:"● Error",disabled:"○ Disabled",not_checked:"◌ Not checked"})[s.status]||s.status;
+    details.className="sensor-meta";details.textContent=s.detail||"";state.append(pill,details);
+    const value=document.createElement("td");value.className="sensor-values";
+    const entries=Object.entries(s.values||{});
+    if(entries.length){for(const [k,v] of entries){const line=document.createElement("div");line.textContent=(pretty[k]||k)+": "+fmt(v,2)+(unitMap[k]?" "+unitMap[k]:"");value.append(line)}}
+    else value.textContent="—";
+    tr.append(name,state,value);body.append(tr);
   }
 }
 async function refresh(){
   try{
     const result=await (await api("/api/v1/status")).json();
     connected=true;running=result.state==="MEASURING";
-    try{await sensorOverview()}catch(e){$("sensorOverview").textContent="Sensor inventory unavailable: "+e.message}
+    try{await sensorOverview()}catch(e){const body=$("sensorOverview");body.replaceChildren();const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=3;td.textContent="Sensor overview unavailable: "+e.message;tr.append(td);body.append(tr)}
     setOnline(true,result.state);
     $("identity").textContent=result.station_id+" · "+result.sensor_mode.toUpperCase()+" sensor mode";
     $("station").textContent=result.station_id;
