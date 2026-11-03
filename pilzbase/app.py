@@ -80,7 +80,15 @@ def create_app(cfg: Config) -> FastAPI:
     def sensor_overview():
         rows = store.rows(max(0, store.count() - 1), 1)
         latest = rows[-1] if rows else None
-        return inventory(hardware_config, cfg.sensor_mode, latest)
+        result = inventory(hardware_config, cfg.sensor_mode, latest)
+        live_errors = physical.errors if physical else {}
+        for sensor in result["sensors"]:
+            if sensor["enabled"] and sensor["id"] in live_errors:
+                sensor["status"] = "error"
+                sensor["detail"] = live_errors[sensor["id"]]
+                sensor["values"] = {}
+        result["last_measurement_at"] = latest.get("acquired_at") if latest else None
+        return result
 
     @app.post("/api/v1/experiments/start")
     def start():
