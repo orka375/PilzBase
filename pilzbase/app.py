@@ -5,6 +5,7 @@ import asyncio
 import csv
 import io
 import logging
+import time
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse, StreamingResponse
 import uvicorn
@@ -44,6 +45,7 @@ def create_app(cfg: Config) -> FastAPI:
             return values
 
     engine = Engine(store, StationSensors(), cfg.station_id, cfg.interval_seconds, cfg.duration_days)
+    preview = {"at": 0.0, "values": {}, "errors": {}, "sampled_at": None}
     hardware = HardwareController(engine, hardware_config)
 
     @asynccontextmanager
@@ -81,17 +83,32 @@ def create_app(cfg: Config) -> FastAPI:
 
     @app.get("/api/v1/sensors")
     def sensor_overview():
-        rows = store.rows(max(0, store.count() - 1), 1)
-        latest = rows[-1] if rows else None
-        result = inventory(hardware_config, cfg.sensor_mode, latest)
-        live_errors = physical.errors if physical else {}
-        for sensor in result["sensors"]:
-            if sensor["enabled"] and sensor["id"] in live_errors:
-                sensor["status"] = "error"
-                sensor["detail"] = live_errors[sensor["id"]]
-                sensor["values"] = {}
-        result["last_measurement_at"] = latest.get("acquired_at") if latest else None
-        return result
+        # A live preview is deliberately NOT saved as an experiment sample.
+        # Share the engine lock to avoid overlapping I2C/SPI transactions.
+        with engine.lock:
+            rows = store.rows(max(0, store.count() - 1), 1)
+            latest = rows[-1] if rows else None
+            if cfg.sensor_mode == "hardware":
+                now = time.monotonic()
+                if now - preview["at"] >= 10 or not preview["sampled_at"]:
+                    try:
+                        preview["values"] = engine.source.read()
+                        preview["errors"] = dict(getattr(engine.source, "errors", {}) or {})
+                    except Exception as exc:
+                        preview["values"] = {}
+                        preview["errors"] = {"source": f"{type(exc).__name__}: {exc}"[:250]}
+                    preview["at"] = time.monotonic()
+                    from datetime import datetime, timezone
+                    preview["sampled_at"] = datetime.now(timezone.utc).isoformat()
+                snapshot = {"values": preview["values"], "errors": preview["errors"],
+                            "simulated": False}
+            else:
+                snapshot = latest
+            result = inventory(hardware_config, cfg.sensor_mode, snapshot)
+            result["last_measurement_at"] = (preview["sampled_at"]
+                if cfg.sensor_mode == "hardware" else latest.get("acquired_at") if latest else None)
+            result["sample_kind"] = "live_preview" if cfg.sensor_mode == "hardware" else "stored"
+            return result
 
     @app.post("/api/v1/experiments/start")
     def start():
