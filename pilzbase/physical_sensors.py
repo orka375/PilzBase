@@ -40,8 +40,15 @@ def max31865_c(cfg):
         raw = ((data[1] << 8) | data[2]) >> 1
         if data[2] & 1:
             raise IOError("MAX31865 RTD fault flag set")
-        r = raw * float(cfg.get("reference_ohms", 430)) / 32768
+        rref = float(cfg.get("reference_ohms", 430))
         nominal = float(cfg.get("rtd_nominal_ohms", 100))
+        if rref <= 0 or nominal <= 0:
+            raise ValueError("MAX31865 reference_ohms and rtd_nominal_ohms must be positive")
+        r = raw * rref / 32768
+        # Reject obvious wiring, wrong-RREF and chip-select errors instead of
+        # presenting absurd temperatures as successful measurements.
+        if not 0.75 * nominal <= r <= 1.7 * nominal:
+            raise ValueError(f"Implausible PT100 resistance {r:.2f} ohm (raw={raw}, RREF={rref:g}); check wiring, SPI chip-select and reference_ohms")
         # Callendar–Van Dusen for >=0 C; negative temperatures not
         # supported by this approximation, fail explicitly instead.
         a, b = 3.9083e-3, -5.775e-7
