@@ -7,7 +7,7 @@ Do not scan every address: a stuck SDA line can make every address appear.
 DEVICES = [
  ("pt100_1", "Temperature", "MAX31865 #1 + PT100", "SPI0 CE0 (proposed)", ["pt100_1_c"]),
  ("pt100_2", "Temperature", "MAX31865 #2 + PT100", "SPI0 CE1 (proposed)", ["pt100_2_c"]),
- ("dfr0553", "ADC", "DFRobot DFR0553 / ADS1115", "I²C1 0x48 (proposed)", []),
+ ("dfr0553", "ADC", "DFRobot DFR0553 / ADS1115", "I²C1 0x48 (proposed)", ["adc_a0_voltage_v"]),
  ("opto_1220", "Distance", "Micro-Epsilon optoNCDT 1220", "DFR0553 A1 (proposed)", ["laser_distance_mm", "laser_current_ma"]),
  ("grove_soil", "Soil moisture", "Seeed Grove Soil Moisture Sensor", "DFR0553 A0 (proposed)", ["soil_voltage_v"]),
  ("bme280", "Environment", "Bosch BME280 (DFRobot module)", "I²C1 0x76", ["bme280_temperature_c", "bme280_humidity_pct", "bme280_pressure_hpa"]),
@@ -71,10 +71,10 @@ def inventory(config, mode, latest=None, probe=False):
             detail = "Simulated mode: physical sensor not polled"
         elif not enabled:
             status, detail = "disabled", "Not enabled in hardware.yaml"
-        elif available and (mode == "hardware" or key == "ups_hat_c"):
-            status, detail = "reading", "Recent valid measurement; physical identity not independently verified"
         elif key in errors:
             status, detail = "error", str(errors[key])
+        elif available and (mode == "hardware" or key == "ups_hat_c"):
+            status, detail = "reading", "Recent valid measurement; physical identity not independently verified"
         else:
             status, detail = "not_checked", "No successful physical measurement yet"
         if probe and key in ("dfr0553", "bme280", "ens160", "scd41", "cjmcu_34725", "ups_hat_c"):
