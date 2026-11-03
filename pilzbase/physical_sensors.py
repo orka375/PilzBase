@@ -215,5 +215,9 @@ class PhysicalSensors:
                     raise
             attempt("scd41", poll_scd)
 
+        # The ADC is proven operational when an enabled channel returns a voltage.
+        # Its inventory row otherwise remains not-checked instead of faking data.
+        if adc.get("enabled") and "soil_voltage_v" in values:
+            values["adc_a0_voltage_v"] = values["soil_voltage_v"]
         self.errors = errors
         return values
