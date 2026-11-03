@@ -208,12 +208,12 @@ class PhysicalSensors:
                     return {}
                 if time.monotonic() - self._scd_started_at < 5.0:
                     return {}
-                return scd41_read(scd)
-            try:
-                attempt("scd41", poll_scd)
-            except Exception:
-                self._scd_started = False
-                raise
+                try:
+                    return scd41_read(scd)
+                except OSError:
+                    self._scd_started = False
+                    raise
+            attempt("scd41", poll_scd)
 
         self.errors = errors
         return values
