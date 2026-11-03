@@ -11,8 +11,8 @@ relays:
     gpio: 20
     laser_off_level: true   # HIGH = laser OFF; LOW = laser ON
 sensors:
-  pt100_1: {enabled: true, interface: spi, bus: 0, device: 0, cs_gpio: 8, rtd_nominal_ohms: 100, reference_ohms: 43000, wires: 3}
-  pt100_2: {enabled: true, interface: spi, bus: 0, device: 1, cs_gpio: 7, rtd_nominal_ohms: 100, reference_ohms: 430, wires: 3}
+  pt100_1: {enabled: true, interface: spi, bus: 0, device: 0, cs_gpio: 8, rtd_nominal_ohms: 100, reference_ohms: 4300, wires: 3}
+  pt100_2: {enabled: true, interface: spi, bus: 0, device: 1, cs_gpio: 7, rtd_nominal_ohms: 100, reference_ohms: 4300, wires: 3}
   dfr0553: {enabled: true, interface: i2c, bus: 1, address: 0x48}
   opto_1220: {enabled: false, adc_channel: 1, shunt_ohms: 150, min_ma: 4, max_ma: 20, min_mm: null, max_mm: null  # Set actual 4mA/20mA distances from laser configuration}
   grove_soil: {enabled: true, adc_channel: 0}
@@ -21,4 +21,6 @@ sensors:
   scd41: {enabled: true, interface: i2c, bus: 1, address: 0x62}
   cjmcu_34725: {enabled: true, interface: i2c, bus: 1, address: 0x29}  # TCS34725 RGBC, no UV
 ups_hat_c: {enabled: true, bus: 1, address: 0x43}
-# PT100 RTD nominal resistance is 100 ohms; physical MAX31865 RREF is 4300 ohms.\n# The 4300 ohm RREF gives ~0.34 C per ADC count near 0 C (10x coarser).\n# The laser remains disabled.
+# PT100 RTD nominal resistance is 100 ohms; physical MAX31865 RREF is 4300 ohms.
+# The 4300 ohm RREF gives ~0.34 C per ADC count near 0 C (10x coarser).
+# The laser remains disabled.
