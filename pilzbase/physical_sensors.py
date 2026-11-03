@@ -84,10 +84,12 @@ def ens160_read(cfg):
         # DATA_STATUS 0x20; data validity is bits [3:2].
         status = bus.read_byte_data(addr, 0x20)
         if ((status >> 2) & 3) != 0:
-            raise IOError("ENS160 data not ready / warming up / invalid")
+            raise IOError(f"ENS160 data invalid / warming up (status=0x{status:02x})")
         aqi = bus.read_byte_data(addr, 0x21)
         tvoc = bus.read_word_data(addr, 0x22)
         eco2 = bus.read_word_data(addr, 0x24)
+    if not (1 <= aqi <= 5 and 400 <= eco2 <= 65000):
+        raise IOError(f"ENS160 implausible air quality (AQI={aqi}, TVOC={tvoc}, eCO2={eco2}, status=0x{status:02x})")
     return {"ens160_aqi": aqi, "ens160_tvoc_ppb": tvoc, "ens160_eco2_ppm": eco2}
 
 
@@ -128,31 +130,23 @@ def scd41_read(cfg):
                 "humidity_rh_pct": 100*word(6)/65535}
 
 def tcs34725_read(cfg):
-    """CJMCU-34725/TCS34725: raw clear, red, green and blue counts.
+    """Read physical RGBC counts with the working CircuitPython driver.
 
-    The color sensor does not measure UV. Readings depend on integration time,
-    gain and illumination; these are not calibrated lux or UV values.
+    The driver handles device-specific initialization and integration timing.
+    Do not turn an I2C address ACK into a claimed physical measurement.
     """
-    from smbus import SMBus
-    bus_id = int(cfg.get("bus", 1))
-    addr = int(cfg.get("address", 0x29))
-    with closing(SMBus(bus_id)) as bus:
-        chip_id = bus.read_byte_data(addr, 0x80 | 0x12)
-        if chip_id not in (0x44, 0x4d):
-            raise IOError(f"Unexpected TCS34725 chip ID 0x{chip_id:02x}")
-        # Integration ~50.4 ms (ATIME 0xEB), gain 4x.
-        bus.write_byte_data(addr, 0x80 | 0x01, 0xeb)
-        bus.write_byte_data(addr, 0x80 | 0x0f, 0x01)
-        bus.write_byte_data(addr, 0x80 | 0x00, 0x01)  # oscillator on
-        time.sleep(0.003)
-        bus.write_byte_data(addr, 0x80 | 0x00, 0x03)  # RGBC ADC on
-        time.sleep(0.065)
-        status = bus.read_byte_data(addr, 0x80 | 0x13)
-        if not status & 0x01:
-            raise IOError("TCS34725 RGBC sample not ready")
-        data = bus.read_i2c_block_data(addr, 0x80 | 0x20 | 0x14, 8)
-    words = [(data[i] | (data[i+1] << 8)) for i in (0, 2, 4, 6)]
-    return dict(zip(("color_clear_raw", "color_red_raw", "color_green_raw", "color_blue_raw"), words))
+    import board
+    import adafruit_tcs34725
+
+    # board.I2C() is the Pi's primary I2C bus (bus 1).
+    if int(cfg.get("bus", 1)) != 1:
+        raise ValueError("TCS34725 CircuitPython reader requires I2C bus 1")
+    if int(cfg.get("address", 0x29)) != 0x29:
+        raise ValueError("TCS34725 CircuitPython reader expects address 0x29")
+    sensor = adafruit_tcs34725.TCS34725(board.I2C())
+    red, green, blue, clear = sensor.color_raw
+    return {"color_clear_raw": clear, "color_red_raw": red,
+            "color_green_raw": green, "color_blue_raw": blue}
 
 
 class PhysicalSensors:
@@ -161,6 +155,7 @@ class PhysicalSensors:
         self.sensors = config.get("sensors", {})
         self.errors = {}
         self._scd_started = False
+        self._scd_started_at = 0.0
 
     def read(self):
         values = {}
@@ -209,8 +204,15 @@ class PhysicalSensors:
                     with SMBus(int(scd.get("bus", 1))) as bus:
                         bus.i2c_rdwr(i2c_msg.write(int(scd.get("address", 0x62)), [0x21, 0xb1]))
                     self._scd_started = True
+                    self._scd_started_at = time.monotonic()
                     return {}
-                return scd41_read(scd)
+                if time.monotonic() - self._scd_started_at < 5.0:
+                    return {}
+                try:
+                    return scd41_read(scd)
+                except OSError:
+                    self._scd_started = False
+                    raise
             attempt("scd41", poll_scd)
 
         self.errors = errors

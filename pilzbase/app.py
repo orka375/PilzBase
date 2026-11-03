@@ -31,12 +31,15 @@ def create_app(cfg: Config) -> FastAPI:
 
     class StationSensors:
         is_simulated = cfg.sensor_mode == "simulated"
+        errors = {}
         def read(self):
             values = physical.read() if physical else SimulatedSensors().read()
+            self.errors = dict(physical.errors) if physical else {}
             if ups:
                 try:
                     values.update(ups.read())
-                except Exception:
+                except Exception as exc:
+                    self.errors["ups_hat_c"] = f"{type(exc).__name__}: {exc}"[:250]
                     log.exception("UPS HAT C read failed")
             return values
 
