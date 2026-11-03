@@ -80,7 +80,9 @@ def ens160_read(cfg):
     with closing(SMBus(int(cfg.get("bus", 1)))) as bus:
         addr = int(cfg.get("address", 0x53))
         # ENS160 OPMODE: 0x02 = standard operation.
-        bus.write_byte_data(addr, 0x10, 0x02)
+        if bus.read_byte_data(addr, 0x10) != 0x02:
+            bus.write_byte_data(addr, 0x10, 0x02)
+            raise IOError("ENS160 switched to standard mode; awaiting valid data")
         # DATA_STATUS 0x20; data validity is bits [3:2].
         status = bus.read_byte_data(addr, 0x20)
         if ((status >> 2) & 3) != 0:
@@ -202,7 +204,11 @@ class PhysicalSensors:
                 from smbus2 import SMBus, i2c_msg
                 if not self._scd_started:
                     with SMBus(int(scd.get("bus", 1))) as bus:
-                        bus.i2c_rdwr(i2c_msg.write(int(scd.get("address", 0x62)), [0x21, 0xb1]))
+                        addr = int(scd.get("address", 0x62))
+                        # Clear stale periodic-measurement state left by a previous process.
+                        bus.i2c_rdwr(i2c_msg.write(addr, [0x3f, 0x86]))
+                        time.sleep(0.5)
+                        bus.i2c_rdwr(i2c_msg.write(addr, [0x21, 0xb1]))
                     self._scd_started = True
                     self._scd_started_at = time.monotonic()
                     return {}
