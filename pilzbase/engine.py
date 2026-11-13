@@ -70,6 +70,7 @@ class Engine:
             errors = {}
             try:
                 values = self.source.read()
+                errors.update(getattr(self.source, "errors", {}) or {})
             except Exception as exc:
                 logger.exception("Sensor source failed")
                 values = {}

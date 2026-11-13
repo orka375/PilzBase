@@ -36,6 +36,8 @@ class UPSHatC:
             power = voltage * current / 1000
             # Approximate voltage-based state of charge; Waveshare warns the
             # reading is inaccurate especially when charging.
+            if not 2.5 <= voltage <= 4.5:
+                raise ValueError(f"INA219 battery voltage {voltage:.3f} V implausible for a single-cell UPS; check board measurement path and calibration")
             pct = max(0.0, min(100.0, (voltage - 3.0) / 1.2 * 100.0))
             return {
                 "battery_voltage_v": round(voltage, 3),

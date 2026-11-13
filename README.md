@@ -188,3 +188,24 @@ and set `sensor_mode: hardware` in `config.yaml`. Only enable after the
 I²C bus scan behaves normally; a scan returning *every* address indicates a
 bus fault. Reboot/restart the station service and start an experiment to see
 RGBC fields in the laptop HMI.
+
+
+### PT100 probes on MAX31865 boards with 4.3 kΩ reference resistors
+
+The connected hardware profile sets **both** MAX31865 inputs to
+`rtd_nominal_ohms: 100` (PT100) and **`reference_ohms: 4300`** (the actual
+board resistor). The driver already computes resistance as
+`RTD_code * reference_ohms / 32768`, so the resistor need not be replaced
+for basic testing. With 4.3 kΩ the quantization is approximately **0.34 °C
+per code near 0 °C**, ten times coarser than with 430 Ω. Check lead-wire
+configuration (`wires: 2`, `3` or `4`), fault flags, and accuracy against a
+reference thermometer. A PT100 at ~20–25 °C is about 107.8–109.7 Ω.
+
+The updated optional `hardware.connected.example.yaml` also enables the
+SCD41 (the previous electrical wiring issue was reported resolved), and
+keeps the laser and relay disabled. The file is **not automatically copied
+over your existing `hardware.yaml`**. Make a backup, inspect the proposed
+I²C/SPI assignments, and copy or merge it manually. For real readings set
+`sensor_mode: hardware` in `config.yaml`, ensure a healthy I²C scan,
+and restart the Pi user service. The dashboard shows readings only after
+an experiment is running and a sample has been saved.
