@@ -1,5 +1,29 @@
 # PilzBase five-station control center
 
+The **new ESP32-S3 design** keeps the webpage, permanent SQLite data, charts,
+and CSV exports on the laptop only. Stations retain unsent samples in internal
+flash, and the laptop polls every minute or on demand with **Sync now**.
+
+Configure each station in `laptop/config.yaml` with its address and API token:
+
+```yaml
+bind_host: 127.0.0.1
+port: 8080
+database_path: ./laptop/pilzbase-laptop.sqlite3
+stations:
+  - id: UNIT-01
+    url: http://192.168.1.101:8000
+    token: replace-with-the-token-from-esp32-local_settings.h
+```
+
+Keep the config private. The station's HTTP is not encrypted; use only trusted
+isolated Wi-Fi. Reformatting ESP32 flash changes its storage generation, and
+sync stops for manual reconciliation rather than silently mixing record IDs.
+
+The older Raspberry Pi setup instructions below remain for legacy devices.
+
+---
+
 Runs on the **laptop**, separate from the five independent Raspberry Pi loggers.
 
 ## Install

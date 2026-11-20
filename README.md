@@ -1,4 +1,18 @@
-# PilzBase — Raspberry Pi station software (v0.1)
+# PilzBase — ESP32-S3 stations and laptop dashboard
+
+The **new experimental design** uses ESP32-S3 N8R8 measurement stations with
+temporary internal flash storage. The laptop alone runs the dashboard, permanent
+SQLite store, graphs and CSV export. Downloaded measurements are reclaimed on
+the station only after a durable laptop database commit and acknowledgment.
+
+See [ESP32 firmware](esp32/PilzBase/README.md) and
+[laptop dashboard](laptop/README.md). The Raspberry Pi implementation below is
+retained as a legacy reference. Hardware wiring, flash endurance and 56-day
+reliability still require tests on real equipment.
+
+---
+
+# Legacy: Raspberry Pi station software (v0.1)
 
 Python 3.11+ autonomous logger for Raspberry Pi Zero 2 W. **Current version operates in simulated-sensor mode only.** No real GPIO/I²C/SPI hardware is controlled yet. Verify the final schematic, voltages, and PT100 channel count before hardware integration.
 

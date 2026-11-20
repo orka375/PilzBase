@@ -29,7 +29,7 @@ canvas{width:100%;height:270px;display:block}
 <main><div class="row"><div><h2 style="font-size:26px">Experiment overview</h2><p class="muted">All stations continue recording independently if this dashboard closes.</p></div>
 <div class="actions"><button id="refresh">↻ Refresh</button><button id="startAll" class="primary">▶ Start all</button><button id="stopAll" class="danger">■ Stop all</button></div></div>
 <p id="summary" class="muted">Connecting…</p><div id="message" aria-live="polite"></div>
-<section class="section panel"><div class="row"><div><h2>Add or update station</h2><p class="muted">Enter a hostname or IP, then verify the station and save its connection.</p></div><form id="addStation" class="actions"><select id="newId" aria-label="Station"><option>UNIT-01</option><option>UNIT-02</option><option>UNIT-03</option><option>UNIT-04</option><option>UNIT-05</option></select><input id="newAddress" placeholder="pilzbase-01.local or 192.168.1.101" required aria-label="IP address or hostname"><button class="primary" type="submit">Connect &amp; save</button></form></div></section><section id="cards" class="grid"></section>
+<section class="section panel"><div class="row"><div><h2>Add or update station</h2><p class="muted">Connect an ESP32 on the same Wi-Fi. Its API token must match the firmware.</p></div><form id="addStation" class="actions"><select id="newId" aria-label="Station"><option>UNIT-01</option><option>UNIT-02</option><option>UNIT-03</option><option>UNIT-04</option><option>UNIT-05</option></select><input id="newAddress" placeholder="unit-01.local or 192.168.1.101" required aria-label="IP address or hostname"><input id="newToken" type="password" placeholder="Station API token" aria-label="Station API token"><button class="primary" type="submit">Connect &amp; save</button></form></div></section><section id="cards" class="grid"></section>
 <section class="section panel sensor-panel"><div class="row"><div><h2>Sensor overview</h2><p class="muted">Exact device models, configured wiring, physical reading status and last recorded values. Simulated values never prove a connection.</p></div><div class="sensor-top"><label for="sensorStation" class="muted">Station</label><select id="sensorStation"><option value="all">All stations</option></select><button id="sensorRefresh">↻ Refresh sensors</button></div></div><p id="sensorSummary" class="muted">Loading sensor inventory…</p><div class="sensor-scroll"><table class="sensor-table"><thead><tr><th>Station</th><th>Type / exact sensor</th><th>Connection</th><th>Status</th><th>Last values</th></tr></thead><tbody id="sensorRows"></tbody></table></div></section>
 <section class="section panel"><div class="row"><div><h2>Compare stations</h2><p class="muted">Recent measurements, one signal across all stations</p></div><select id="metric"><option value="pt100_1_c">PT100-1 temperature (°C)</option><option value="co2_ppm">CO₂ (ppm)</option><option value="humidity_rh_pct">Humidity (%)</option><option value="laser_distance_mm">Laser distance (mm)</option><option value="soil_voltage_v">Soil voltage (V)</option><option value="color_clear_raw">TCS34725 clear (raw)</option><option value="color_red_raw">TCS34725 red (raw)</option><option value="color_green_raw">TCS34725 green (raw)</option><option value="color_blue_raw">TCS34725 blue (raw)</option><option value="bme280_temperature_c">BME280 temperature (°C)</option><option value="bme280_humidity_pct">BME280 humidity (%)</option><option value="bme280_pressure_hpa">BME280 pressure (hPa)</option><option value="ens160_tvoc_ppb">ENS160 TVOC (ppb)</option><option value="ens160_eco2_ppm">ENS160 eCO₂ (ppm)</option><option value="battery_voltage_v">UPS battery voltage (V)</option><option value="battery_current_ma">UPS battery current (mA)</option><option value="battery_power_w">UPS battery power (W)</option><option value="battery_capacity_est_pct">UPS battery estimate (%)</option></select></div><canvas id="trend"></canvas></section>
 <p class="muted section">Dashboard updates every 15 seconds · Offline stations cannot be controlled · Sensor mode is configured per Raspberry Pi: simulated = test data, hardware = enabled physical sensors.</p>
@@ -55,33 +55,30 @@ for(const s of stations){
 const card=el("article","card"+(s.online?"":" off"));const head=el("div","row");head.append(el("span","label",s.id),el("span","badge"+(s.online?"":" off"),s.online?s.status.state:"OFFLINE"));card.append(head);
 const latest=s.latest?.values||{};const metrics=el("div","metrics");
 for(const [label,value] of [["PT100-1",fmt(latest.pt100_1_c)+" °C"],["CO₂",fmt(latest.co2_ppm,0)+" ppm"],["Humidity",fmt(latest.humidity_rh_pct)+" %"],["Laser",fmt(latest.laser_distance_mm)+" mm"],["UPS battery",fmt(latest.battery_voltage_v,2)+" V"],["UPS charge est.",fmt(latest.battery_capacity_est_pct,0)+" %"]]){
- const m=el("div");m.append(el("div","muted",label),el("div","num",s.online?value:"—"));metrics.append(m)}
-card.append(metrics);card.append(el("p","muted",s.online?"Sensor mode: "+(s.status.sensor_mode||"unknown"):"Sensor mode: unavailable"));card.append(el("p","muted",s.online?"Samples: "+s.status.measurements+" · Last: "+date(s.latest?.acquired_at):s.error||"Station unreachable"));
+ const m=el("div");m.append(el("div","muted",label),el("div","num",s.latest?value:"—"));metrics.append(m)}
+card.append(metrics);card.append(el("p","muted",s.online?"Sensor mode: "+(s.status.sensor_mode||"unknown")+" · Flash pending: "+(s.status.pending_records??"—")+" · Used: "+(s.status.flash_used_bytes??"—")+" bytes":"Sensor mode: unavailable"));card.append(el("p","muted",s.online?"Laptop samples: "+s.status.measurements+" · Last: "+date(s.latest?.acquired_at):s.error||"Station unreachable"));
 const controls=el("div","actions");const running=s.online&&s.status.state==="MEASURING";
 controls.append(button("Start","primary",()=>control(s.id,"start"),!s.online||running||busy));
 controls.append(button("Stop","danger",()=>control(s.id,"stop"),!running||busy));
-controls.append(button("Export CSV","",()=>exportCsv(s.id),!s.online||busy));
+controls.append(button("Sync now","",()=>syncStation(s.id),!s.online||busy));
+controls.append(button("Export CSV","",()=>exportCsv(s.id),busy));
 controls.append(button("Remove","danger",()=>removeStation(s.id),busy));card.append(controls);root.append(card)
 }}
 async function exportCsv(id){
-try{let after=0;let all=[];let header="";for(let page=0;page<200;page++){
- const rows=(await request("/api/stations/"+id+"/measurements?after_id="+after+"&limit=5000")).rows;
- if(!rows.length)break;
- if(!header)header=["id","experiment_id","acquired_at",...Object.keys(rows[0].values)].join(",");
- rows.forEach(row=>all.push([row.id,row.experiment_id,row.acquired_at,...Object.values(row.values)].map(v=>v??"").join(",")));
- after=rows[rows.length-1].id;if(rows.length<5000)break;
+window.location.href="/api/stations/"+encodeURIComponent(id)+"/measurements.csv";
 }
-const blob=new Blob([header+"\n"+all.join("\n")+"\n"],{type:"text/csv"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=id+"-measurements.csv";a.click();setTimeout(()=>URL.revokeObjectURL(url),30000)
-}catch(e){$("message").textContent=id+": "+e.message}}
+async function syncStation(id){
+try{const result=await request("/api/stations/"+id+"/sync",{method:"POST"});$("message").textContent=id+": downloaded "+result.downloaded+" records";await refresh()}
+catch(e){$("message").textContent=id+": "+e.message}}
 async function removeStation(id){
-if(!confirm("Remove "+id+" from the dashboard? Its Raspberry Pi keeps recording."))return;
+if(!confirm("Remove "+id+" from the dashboard? Its ESP32 keeps recording."))return;
 try{await request("/api/stations/"+id,{method:"DELETE"});$("message").textContent=id+" removed.";await refresh()}
 catch(e){$("message").textContent="Remove failed: "+e.message}}
 $("addStation").onsubmit=async event=>{
 event.preventDefault();
 const form=$("addStation"),button=form.querySelector("button[type=submit]");
 button.disabled=true;$("message").textContent="Connecting to station…";
-try{const result=await request("/api/stations/connect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:$("newId").value,address:$("newAddress").value.trim()})});
+try{const result=await request("/api/stations/connect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:$("newId").value,address:$("newAddress").value.trim(),token:$("newToken").value})});
 $("message").textContent=result.id+" successfully connected at "+result.url;await refresh()}
 catch(e){$("message").textContent="Could not add station: "+e.message}
 finally{button.disabled=false}};
@@ -97,7 +94,7 @@ ctx.font="12px system-ui";for(let i=0;i<4;i++){const yy=top+i*height/3;ctx.strok
 stations.forEach((s,index)=>{const rows=series[s.id]||[];ctx.strokeStyle=colors[index];ctx.lineWidth=2;ctx.beginPath();let opened=false;
  rows.forEach(r=>{const t=Date.parse(r.acquired_at),v=r.values?.[metric];if(!Number.isFinite(t)||typeof v!=="number"){opened=false;return}if(!opened){ctx.moveTo(x(t),y(v));opened=true}else ctx.lineTo(x(t),y(v))});ctx.stroke();
  ctx.fillStyle=colors[index];ctx.fillText(s.id,left+index*80,rect.height-7)})}
-const sensorUnits={color_clear_raw:"counts",color_red_raw:"counts",color_green_raw:"counts",color_blue_raw:"counts",pt100_1_c:"°C",pt100_2_c:"°C",laser_distance_mm:"mm",laser_current_ma:"mA",soil_voltage_v:"V",bme280_temperature_c:"°C",bme280_humidity_pct:"%",bme280_pressure_hpa:"hPa",ens160_aqi:"",ens160_tvoc_ppb:"ppb",ens160_eco2_ppm:"ppm",co2_ppm:"ppm",air_temperature_c:"°C",humidity_rh_pct:"%",battery_voltage_v:"V",battery_current_ma:"mA",battery_power_w:"W",battery_capacity_est_pct:"%"};
+const sensorUnits={color_clear_raw:"counts",color_red_raw:"counts",color_green_raw:"counts",color_blue_raw:"counts",pt100_1_c:"°C",pt100_2_c:"°C",laser_distance_mm:"mm",laser_current_ma:"mA",soil_voltage_v:"V",bme280_temperature_c:"°C",bme280_humidity_pct:"%",bme280_pressure_hpa:"hPa",ens160_aqi:"",ens160_tvoc_ppb:"ppb",ens160_eco2_ppm:"ppm",co2_ppm:"ppm",air_temperature_c:"°C",humidity_rh_pct:"%",battery_voltage_v:"V",battery_current_ma:"mA",battery_power_w:"W",battery_capacity_est_pct:"%",ups_bus_voltage_v:"V",ups_shunt_voltage_mv:"mV"};
 function updateSensorStationOptions(){
  const selector=$("sensorStation"),selected=selector.value;
  selector.replaceChildren();
@@ -143,7 +140,7 @@ async function refresh(){
 try{
  const payload=await request("/api/stations");stations=payload.stations;$("summary").textContent=stations.filter(s=>s.online).length+" / "+stations.length+" configured stations online · "+stations.filter(s=>s.online&&s.status.state==="MEASURING").length+" measuring";
  drawCards();updateSensorStationOptions();await refreshSensorInventories();
- const results=await Promise.all(stations.filter(s=>s.online).map(async s=>{try{const offset=Math.max(0,(s.status.measurements||0)-240);return [s.id,(await request("/api/stations/"+s.id+"/measurements?after_id="+offset+"&limit=240")).rows]}catch{return[s.id,[]]}}));
+ const results=await Promise.all(stations.map(async s=>{try{const offset=Math.max(0,(s.status.measurements||0)-240);return [s.id,(await request("/api/stations/"+s.id+"/measurements?after_id="+offset+"&limit=240")).rows]}catch{return[s.id,[]]}}));
  series=Object.fromEntries(results);drawTrend();
 }catch(e){$("message").textContent="Unable to refresh: "+e.message}}
 $("startAll").onclick=()=>control(null,"start");$("stopAll").onclick=()=>control(null,"stop");$("refresh").onclick=refresh;$("metric").onchange=drawTrend;$("sensorStation").onchange=drawSensorInventory;$("sensorRefresh").onclick=refreshSensorInventories;

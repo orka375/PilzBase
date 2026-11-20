@@ -10,6 +10,9 @@ import json
 import os
 import socket
 import tempfile
+from contextlib import asynccontextmanager
+import csv
+import io
 from threading import RLock
 from pathlib import Path
 import re
@@ -20,7 +23,8 @@ from urllib.request import Request as URLRequest, urlopen
 import uvicorn
 import yaml
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from .collector import Collector
 
 ROOT = Path(__file__).resolve().parent
 ID_PATTERN = re.compile(r"UNIT-[0-9]{2}\Z")
@@ -31,6 +35,7 @@ def load_config(path: str):
     if not isinstance(obj, dict) or not isinstance(obj.get("stations"), list):
         raise ValueError("Missing stations list in configuration")
     stations = {}
+    tokens = {}
     for station in obj["stations"]:
         if not isinstance(station, dict) or not ID_PATTERN.fullmatch(str(station.get("id", ""))):
             raise ValueError("Invalid station identifier")
@@ -42,6 +47,8 @@ def load_config(path: str):
         if sid in stations:
             raise ValueError(f"Duplicate station ID: {sid}")
         stations[sid] = url
+        if station.get("token"):
+            tokens[sid] = str(station["token"])
     if len(stations) > 5 or not set(stations).issubset({f"UNIT-{i:02}" for i in range(1, 6)}):
         raise ValueError("Only UNIT-01 to UNIT-05 are supported")
     host = obj.get("bind_host", "127.0.0.1")
@@ -50,16 +57,20 @@ def load_config(path: str):
     port = int(obj.get("port", 8080))
     if not (1 <= port <= 65535):
         raise ValueError("Invalid port")
-    return {"stations": stations, "bind_host": host, "port": port, "config_path": str(Path(path).resolve())}
+    database_path = obj.get("database_path") or str(Path(path).resolve().parent / "pilzbase-laptop.sqlite3")
+    return {"stations": stations, "tokens": tokens, "bind_host": host, "port": port, "config_path": str(Path(path).resolve()), "database_path": database_path}
 
 
-def fetch_station(sid, base_url, path, method="GET", *, timeout=4):
+def fetch_station(sid, base_url, path, method="GET", *, timeout=4, payload=None, token=""):
     # Do not follow redirects to unexpected hosts.
     from urllib.request import build_opener, HTTPRedirectHandler
     class NoRedirect(HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
             return None
-    req = URLRequest(base_url + path, method=method)
+    req = URLRequest(base_url + path, method=method,
+        data=json.dumps(payload).encode() if payload is not None else None,
+        headers={**({"Content-Type": "application/json"} if payload is not None else {}),
+                 **({"X-Pilz-Token": token} if token else {})})
     try:
         with build_opener(NoRedirect).open(req, timeout=timeout) as response:
             body = response.read(2_000_000)
@@ -71,17 +82,76 @@ def fetch_station(sid, base_url, path, method="GET", *, timeout=4):
 
 
 def create_app(config):
-    app = FastAPI(title="PilzBase Central Dashboard", version="0.2.0")
+    collector = Collector(config.get("database_path", ":memory:"))
     stations = dict(config["stations"])
+    tokens = dict(config.get("tokens", {}))
     lock = RLock()
     config_path = config.get("config_path")
+
+    def sync_one(sid):
+        if sid not in stations:
+            raise ValueError("Unknown station")
+        base = stations[sid]
+        status = fetch_station(sid, base, "/api/v1/status")
+        generation = status.get("storage_generation")
+        if not generation:
+            return {"station_id": sid, "mode": "legacy", "downloaded": 0}
+        downloaded = 0
+        while True:
+            cursor = collector.cursor(sid)
+            if cursor and cursor["generation"] != generation:
+                raise ValueError("Station storage generation changed; review before synchronization")
+            last = cursor["last_id"] if cursor else 0
+            packet = fetch_station(sid, base, f"/api/v1/measurements?after_id={last}&limit=100")
+            if packet.get("storage_generation") != generation:
+                raise ValueError("Station changed storage generation during download")
+            rows = packet.get("rows", [])
+            if not isinstance(rows, list):
+                raise ValueError("Invalid measurement response")
+            committed = collector.ingest(sid, generation, rows)
+            # Also resend the last ACK if the response was lost earlier.
+            fetch_station(sid, base, "/api/v1/measurements/ack", "POST",
+                          payload={"generation": generation, "through_id": committed}, token=tokens.get(sid, ""))
+            downloaded += len(rows)
+            if len(rows) < 100:
+                break
+        return {"station_id": sid, "mode": "esp32", "downloaded": downloaded,
+                "last_id": collector.cursor(sid)["last_id"]}
+
+    @asynccontextmanager
+    async def lifespan(app):
+        async def periodic():
+            while True:
+                with lock:
+                    targets = list(stations)
+                for sid in targets:
+                    try:
+                        await asyncio.to_thread(sync_one, sid)
+                    except Exception:
+                        # Individual stations may be offline; retry next interval.
+                        pass
+                await asyncio.sleep(60)
+        task = asyncio.create_task(periodic())
+        try:
+            yield
+        finally:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            collector.close()
+
+    app = FastAPI(title="PilzBase Central Dashboard", version="0.3.0", lifespan=lifespan)
 
     def persist():
         if not config_path:
             raise HTTPException(409, "Persistence requires a configuration file")
         config_file = Path(config_path)
         obj = {"bind_host": config["bind_host"], "port": config["port"],
-               "stations": [{"id": sid, "url": url} for sid, url in sorted(stations.items())]}
+               "database_path": config.get("database_path", "laptop/pilzbase-laptop.sqlite3"),
+               "stations": [{"id": sid, "url": url, **({"token": tokens[sid]} if sid in tokens else {})}
+                            for sid, url in sorted(stations.items())]}
         for target, payload, mode in ((config_file, yaml.safe_dump(obj, sort_keys=False), 0o600),):
             fd, tmp = tempfile.mkstemp(prefix=".pilzbase-", dir=target.parent)
             try:
@@ -128,6 +198,8 @@ def create_app(config):
             raise HTTPException(409, "Connected device has another station ID")
         with lock:
             stations[sid] = url
+            if data.get("token"):
+                tokens[sid] = str(data["token"])
             persist()
         return {"id": sid, "url": url, "connected": True}
 
@@ -137,6 +209,7 @@ def create_app(config):
             if sid not in stations:
                 raise HTTPException(404, "Unknown station")
             del stations[sid]
+            tokens.pop(sid, None)
             persist()
         return {"removed": sid}
 
@@ -153,7 +226,8 @@ def create_app(config):
         if sid not in stations:
             raise HTTPException(404, "Unknown station")
         try:
-            return await asyncio.to_thread(fetch_station, sid, stations[sid], endpoint, method)
+            return await asyncio.to_thread(fetch_station, sid, stations[sid], endpoint, method,
+                                            token=tokens.get(sid, ""))
         except RuntimeError as exc:
             raise HTTPException(502, str(exc)) from exc
 
@@ -162,15 +236,58 @@ def create_app(config):
         async def one(sid):
             try:
                 status = await call(sid, "/api/v1/status")
-                latest = await call(sid, "/api/v1/measurements?after_id=" + str(max(0, int(status.get("measurements", 0)) - 1)) + "&limit=1")
-                return {"id": sid, "online": True, "url": stations[sid], "status": status, "latest": (latest.get("rows") or [None])[-1]}
+                if status.get("storage_generation"):
+                    rows = collector.rows(sid, max(0, (collector.cursor(sid) or {}).get("last_id", 0) - 1), 1)
+                    latest = rows[-1] if rows else None
+                    status["measurements"] = collector.count(sid)
+                else:
+                    result = await call(sid, "/api/v1/measurements?after_id=" + str(max(0, int(status.get("measurements", 0)) - 1)) + "&limit=1")
+                    latest = (result.get("rows") or [None])[-1]
+                return {"id": sid, "online": True, "url": stations[sid], "status": status, "latest": latest}
             except (HTTPException, ValueError, TypeError) as exc:
-                return {"id": sid, "online": False, "url": stations[sid], "error": getattr(exc, "detail", str(exc))}
+                cursor = collector.cursor(sid)
+                rows = collector.rows(sid, max(0, cursor["last_id"] - 1), 1) if cursor else []
+                return {"id": sid, "online": False, "url": stations[sid],
+                        "latest": rows[-1] if rows else None,
+                        "status": {"measurements": collector.count(sid), "state": "OFFLINE"},
+                        "error": getattr(exc, "detail", str(exc))}
         return {"stations": await asyncio.gather(*(one(sid) for sid in stations))}
 
     @app.get("/api/stations/{sid}/measurements")
     async def readings(sid: str, after_id: int = Query(0, ge=0), limit: int = Query(240, ge=1, le=5000)):
+        if sid not in stations:
+            raise HTTPException(404, "Unknown station")
+        if collector.cursor(sid):
+            return {"station_id": sid, "rows": collector.rows(sid, after_id, limit)}
         return await call(sid, f"/api/v1/measurements?after_id={after_id}&limit={limit}")
+
+    @app.post("/api/stations/{sid}/sync")
+    async def synchronize(sid: str):
+        if sid not in stations:
+            raise HTTPException(404, "Unknown station")
+        try:
+            return await asyncio.to_thread(sync_one, sid)
+        except (ValueError, RuntimeError) as exc:
+            raise HTTPException(502, str(exc)) from exc
+
+    @app.get("/api/stations/{sid}/measurements.csv")
+    def export_station(sid: str):
+        if sid not in stations:
+            raise HTTPException(404, "Unknown station")
+        out = io.StringIO()
+        writer = csv.writer(out)
+        writer.writerow(["id", "acquired_at", "experiment_id", "values_json", "errors_json"])
+        after = 0
+        while True:
+            batch = collector.rows(sid, after, 1000)
+            if not batch:
+                break
+            for r in batch:
+                writer.writerow([r["id"], r["acquired_at"], r["experiment_id"],
+                                 json.dumps(r["values"]), json.dumps(r["errors"])])
+            after = batch[-1]["id"]
+        return StreamingResponse(iter([out.getvalue()]), media_type="text/csv",
+                                 headers={"Content-Disposition": f"attachment; filename={sid}.csv"})
 
     @app.get("/api/stations/{sid}/sensors")
     async def sensor_overview(sid: str):
