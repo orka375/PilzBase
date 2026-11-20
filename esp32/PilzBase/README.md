@@ -37,6 +37,31 @@ valid NTP time. Active experiments persist through reset.
 
 ## Hardware precautions
 
+### Laser current-loop serial test
+
+The standalone `src/laser_test.cpp` reads the **M5Stack AIN4-20mA U162**
+at I²C address `0x55` and prints the firmware register, raw 12-bit ADC value,
+current in mA, and input-range warnings once per second. It optionally calculates
+distance only after the actual 4 mA and 20 mA endpoints are verified.
+The user-confirmed relay polarity is **HIGH/true = laser ON, LOW/false = OFF**.
+Relay control remains **disabled (`RELAY_GPIO = -1`)** until its ESP32 pin and
+electrical safe-off behavior are verified. Once configured, the serial monitor
+accepts `on` and `off`, and any `on` command automatically times out after ten
+seconds. Do not rely on this software timeout as a laser safety interlock.
+
+From `esp32/PilzBase`:
+
+```bash
+pio run -e laser-test -t upload
+pio device monitor -e laser-test -b 115200
+```
+
+Return to the regular station firmware using
+`pio run -e esp32-s3-n8r8 -t upload`. Use the test only after verifying the
+M5Stack module supply, 3.3 V-safe I²C signals, and 4–20 mA terminal wiring.
+Do not connect the laser's 24 V supply or current-loop wires directly to ESP32
+GPIOs. M5Stack U162 current/ADC registers are read-only in this diagnostic.
+
 The original `src/main.cpp` sensor diagnostics are still available on serial.
 Two MAX31865 channels use PT100 nominal 100 Ω, reference 430 Ω and **3-wire** mode.
 Physical jumpers, probe wiring, and modified reference resistors must be tested.
