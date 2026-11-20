@@ -10,9 +10,9 @@ constexpr uint8_t AIN_ADDRESS = 0x55;
 constexpr unsigned long REPORT_EVERY_MS = 1000;
 
 // CONFIRMED USER POLARITY: relay HIGH/true = laser ON, LOW/false = laser OFF.
-// GPIO21 was proposed, NOT confirmed. Keep -1 until the actual connection
-// and independent safe-off circuitry are checked.
-constexpr int RELAY_GPIO = -1;
+// User-confirmed laser ON/OFF control output: ESP32-S3 GPIO41.
+// Verify the relay driver and independent safe-off circuitry before testing.
+constexpr int RELAY_GPIO = 41;
 constexpr bool RELAY_HIGH_TURNS_LASER_ON = true;
 constexpr unsigned long LASER_MAX_ON_MS = 10000; // Automatic timeout during tests.
 bool laserOn = false;

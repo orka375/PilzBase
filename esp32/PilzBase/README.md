@@ -44,10 +44,10 @@ at I²C address `0x55` and prints the firmware register, raw 12-bit ADC value,
 current in mA, and input-range warnings once per second. It optionally calculates
 distance only after the actual 4 mA and 20 mA endpoints are verified.
 The user-confirmed relay polarity is **HIGH/true = laser ON, LOW/false = OFF**.
-Relay control remains **disabled (`RELAY_GPIO = -1`)** until its ESP32 pin and
-electrical safe-off behavior are verified. Once configured, the serial monitor
-accepts `on` and `off`, and any `on` command automatically times out after ten
-seconds. Do not rely on this software timeout as a laser safety interlock.
+The user-confirmed control output is **ESP32 GPIO41**. In the isolated laser test,
+the serial monitor accepts `on` and `off`, and any `on` command automatically
+times out after ten seconds. The laser starts OFF and is not enabled merely by
+flashing the test. Do not rely on this software timeout as a laser safety interlock.
 
 From `esp32/PilzBase`:
 
@@ -67,9 +67,10 @@ Two MAX31865 channels use PT100 nominal 100 Ω, reference 430 Ω and **3-wire** 
 Physical jumpers, probe wiring, and modified reference resistors must be tested.
 
 GPIO8/9 are I²C, GPIO38/39/40 SPI SCK/MOSI/MISO, GPIO10/14 chip selects,
-GPIO5 soil analog input. Button, status LED and relay GPIOs are deliberately
-unassigned (`-1` in `pins.h`), since setup notes conflict with test code. The
-relay and laser are **never energized by this firmware**.
+GPIO5 soil analog input, GPIO41 laser relay output. Button and status LED GPIOs
+remain unassigned (`-1` in `pins.h`) due to conflicting test notes. The normal
+station firmware does **not** actuate the laser; only the isolated laser test
+can switch GPIO41 after an explicit serial `on` command.
 
 The Waveshare UPS HAT (C) INA219 is probed at I²C `0x43`. Its bus voltage is
 *not* a direct measurement of cell voltage. Implausible ~0.46 V readings are
