@@ -11,7 +11,7 @@ constexpr int SPI_SCK_PIN = 38, SPI_MISO_PIN = 40, SPI_MOSI_PIN = 39;
 constexpr int PT100_CS1 = 10, PT100_CS2 = 14;
 constexpr int MOISTURE_PIN = 5, LED_PIN = 7;
 constexpr int BUTTON_PIN = 3;
-constexpr bool BUTTON_ACTIVE_LOW = true;
+constexpr bool BUTTON_ACTIVE_LOW = false;
 constexpr bool LED_ACTIVE_HIGH = true;
 constexpr float RTD_NOMINAL = 100.0f;    // PT100; use 1000.0 for PT1000
 constexpr float REF_RESISTOR = 430.0f;   // Adafruit PT100 boards normally 430 ohms
